@@ -53,6 +53,7 @@
         <div>
           <h1 class="text-lg font-bold tracking-tight">Collaboration Pipeline</h1>
           <p class="text-xs text-slate-400">Cisco SE &amp; AM Opportunity Tracker</p>
+          <p id="deployment-label" class="text-[10px] text-slate-600 mt-0.5" title="Each GitHub Pages repo stores data separately"></p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -244,7 +245,19 @@
   (function () {
     'use strict';
 
-    const STORAGE_KEY = 'cisco_collab_pipeline_v1';
+    const LEGACY_STORAGE_KEY = 'cisco_collab_pipeline_v1';
+
+    /** Each GitHub Pages repo path gets its own localStorage namespace (same origin shares storage otherwise). */
+    function getStorageKey() {
+      const path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+      const slug = path.replace(/[^a-zA-Z0-9/_-]/g, '_').replace(/\//g, '__').replace(/_+/g, '_').slice(0, 100);
+      return 'cisco_collab_pipeline_v1__' + (slug === '/' ? 'root' : slug);
+    }
+
+    function getDeploymentLabel() {
+      const path = (window.location.pathname || '/').replace(/\/+$/, '') || '/';
+      return path === '/' ? 'root' : path.replace(/^\//, '');
+    }
 
     const STAGES = [
       'Discovery / Demo',
@@ -451,7 +464,17 @@
     };
 
     function load() {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const storageKey = getStorageKey();
+      let raw = localStorage.getItem(storageKey);
+
+      if (!raw) {
+        const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacy) {
+          raw = legacy;
+          localStorage.setItem(storageKey, legacy);
+        }
+      }
+
       if (raw) {
         try { state.deals = JSON.parse(raw); return; } catch (e) { /* fall through */ }
       }
@@ -460,7 +483,7 @@
     }
 
     function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.deals));
+      localStorage.setItem(getStorageKey(), JSON.stringify(state.deals));
     }
 
     function getFilteredDeals() {
@@ -759,6 +782,8 @@
       init() {
         load();
         populateFormSelects();
+        const deployEl = document.getElementById('deployment-label');
+        if (deployEl) deployEl.textContent = 'Data store: ' + getDeploymentLabel();
         document.getElementById('search-input').addEventListener('input', e => {
           state.search = e.target.value;
           render();
