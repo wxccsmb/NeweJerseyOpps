@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cisco Collaboration Pipeline — SE &amp; AM Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cisco: { cyan: '#00BCF2', blue: '#005073' }
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+  <style>
+    * { scrollbar-width: thin; scrollbar-color: #334155 #0f172a; }
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-track { background: #0f172a; }
+    *::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    *::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .deal-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+    .deal-card.bump { animation: bump 0.6s ease; }
+    @keyframes bump {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0,188,242,0.4); }
+      30% { transform: scale(1.01); box-shadow: 0 0 20px 4px rgba(0,188,242,0.25); border-color: #00BCF2; }
+      100% { transform: scale(1); box-shadow: none; }
+    }
+    .kpi-card { transition: all 0.2s ease; }
+    .kpi-card:hover, .kpi-card.active { transform: translateY(-2px); }
+    .modal-backdrop { animation: fadeIn 0.2s ease; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .stage-bar { transition: width 0.4s ease; }
+    .note-form { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; opacity: 0; }
+    .note-form.open { max-height: 200px; opacity: 1; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800 bg-slate-950/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-cisco-cyan to-cisco-blue flex items-center justify-center font-bold text-sm">CX</div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight">Collaboration Pipeline</h1>
+          <p class="text-xs text-slate-400">Cisco SE &amp; AM Opportunity Tracker</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button onclick="App.openImportModal()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Import</button>
+        <button onclick="App.exportExcel()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Export Excel</button>
+        <button onclick="App.exportCSV()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Export CSV</button>
+        <button onclick="App.downloadTemplate()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Template</button>
+        <button onclick="App.backupJSON()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-slate-500 transition">Backup JSON</button>
+        <button onclick="App.restoreJSON()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-slate-500 transition">Restore JSON</button>
+        <button onclick="App.openDealModal()" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-cisco-cyan text-slate-950 hover:bg-sky-300 transition">+ New Deal</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <!-- KPI Ribbon -->
+    <section id="kpi-ribbon" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></section>
+
+    <!-- Toolbar -->
+    <section class="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
+      <div id="status-tabs" class="flex rounded-lg border border-slate-800 overflow-hidden"></div>
+      <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+        <div class="relative flex-1 min-w-[200px] lg:w-72">
+          <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="search-input" type="search" placeholder="Search deals, contacts, notes…" class="w-full pl-10 pr-4 py-2 text-sm rounded-lg bg-slate-900 border border-slate-800 focus:border-cisco-cyan focus:outline-none focus:ring-1 focus:ring-cisco-cyan/50 transition">
+        </div>
+        <select id="sort-select" class="text-sm rounded-lg bg-slate-900 border border-slate-800 px-3 py-2 focus:border-cisco-cyan focus:outline-none">
+          <option value="recent">Most Recent Notes</option>
+          <option value="amount">Deal Amount (High → Low)</option>
+          <option value="closeDate">Target Close Date</option>
+        </select>
+      </div>
+    </section>
+
+    <!-- Deal Feed -->
+    <section id="deal-feed" class="space-y-4"></section>
+    <div id="empty-state" class="hidden text-center py-16 text-slate-500">
+      <p class="text-lg">No deals match your filters</p>
+      <button onclick="App.clearFilters()" class="mt-3 text-cisco-cyan hover:underline text-sm">Clear all filters</button>
+    </div>
+  </main>
+
+  <!-- Deal Modal -->
+  <div id="deal-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div class="modal-backdrop fixed inset-0 bg-black/70" onclick="App.closeDealModal()"></div>
+    <div class="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-3xl my-8 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <h2 id="deal-modal-title" class="text-lg font-semibold">New Opportunity</h2>
+        <button onclick="App.closeDealModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+      <form id="deal-form" class="p-6 space-y-6 max-h-[75vh] overflow-y-auto" onsubmit="App.saveDeal(event)">
+        <input type="hidden" id="deal-id">
+
+        <fieldset class="space-y-3">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-cisco-cyan">Deal Overview</legend>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-400 mb-1">Opportunity Title</label>
+              <input name="title" required class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Solution Category</label>
+              <select name="solution" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Stage</label>
+              <select name="stage" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Deal Amount ($)</label>
+              <input name="amount" type="number" min="0" step="1000" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Target Close Date</label>
+              <input name="closeDate" type="date" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Health</label>
+              <select name="health" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+                <option value="Green">Green</option>
+                <option value="Yellow">Yellow</option>
+                <option value="Red">Red</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Ball in Court</label>
+              <select name="ballInCourt" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></select>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-400 mb-1">What's Next</label>
+              <textarea name="whatsNext" rows="2" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></textarea>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-blue-400">Cisco Account Team</legend>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Assigned Solutions Engineer (SE)</label>
+              <input name="se" placeholder="Alejandra Gonzalez Romero (SE)" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Assigned Account Manager (AM)</label>
+              <input name="am" placeholder="David Miller (AM)" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Customer Account &amp; Lead Contact</legend>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-400 mb-1">Customer / Account Name</label>
+              <input name="customer" placeholder="Banco Santander" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Customer Contact Name &amp; Role</label>
+              <input name="customerContact" placeholder="Dr. Roberto Silva - CIO / VP Infrastructure" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Customer Contact Email / Phone</label>
+              <input name="customerEmail" placeholder="roberto.silva@bank.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-purple-400">Involved Partner Information</legend>
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Partner Organization</label>
+              <input name="partner" placeholder="NTT Data" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Partner Lead Contact / SE</label>
+              <input name="partnerContact" placeholder="Carlos Mendoza - Lead Architect" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-400 mb-1">Partner Contact Email / Phone</label>
+              <input name="partnerEmail" placeholder="carlos.mendoza@nttdata.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="space-y-3">
+          <legend class="text-xs font-semibold uppercase tracking-wider text-cisco-cyan">Cisco S&amp;C Deal Integration</legend>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">S&amp;C Link (Scope &amp; Commit URL)</label>
+            <input name="scLink" type="url" placeholder="https://sc.cisco.com/deal/1049281" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+        </fieldset>
+
+        <div class="flex justify-end gap-3 pt-2 border-t border-slate-800">
+          <button type="button" onclick="App.closeDealModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-700 hover:border-slate-500 transition">Cancel</button>
+          <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg bg-cisco-cyan text-slate-950 hover:bg-sky-300 transition">Save Deal</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Import Modal -->
+  <div id="import-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-backdrop fixed inset-0 bg-black/70" onclick="App.closeImportModal()"></div>
+    <div class="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-md p-6 shadow-2xl">
+      <h2 class="text-lg font-semibold mb-4">Import Deals</h2>
+      <p class="text-sm text-slate-400 mb-4">Upload an Excel (.xlsx, .xls) or CSV file. Column headers are matched flexibly (case-insensitive).</p>
+      <input type="file" id="import-file" accept=".xlsx,.xls,.csv" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700 mb-4">
+      <div class="flex gap-3 mb-4">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="radio" name="import-mode" value="append" checked class="accent-cisco-cyan"> Append to existing
+        </label>
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="radio" name="import-mode" value="replace" class="accent-cisco-cyan"> Replace all data
+        </label>
+      </div>
+      <div class="flex justify-end gap-3">
+        <button onclick="App.closeImportModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-700 hover:border-slate-500 transition">Cancel</button>
+        <button onclick="App.processImport()" class="px-5 py-2 text-sm font-semibold rounded-lg bg-cisco-cyan text-slate-950 hover:bg-sky-300 transition">Import</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden file input for JSON restore -->
+  <input type="file" id="restore-file" accept=".json" class="hidden">
+
+  <script>
+  (function () {
+    'use strict';
+
+    const STORAGE_KEY = 'cisco_collab_pipeline_v1';
+
+    const STAGES = [
+      'Discovery / Demo',
+      'Validation / PoC',
+      'Architecture / BoM',
+      'Proposal / Pricing',
+      'Closing',
+      'Closed'
+    ];
+
+    const SOLUTIONS = [
+      'Webex Calling & Cloud Connect',
+      'Webex Contact Center & AI',
+      'Cisco Room Devices (RoomOS / Teams Rooms mode)',
+      'Webex Suite & Meetings'
+    ];
+
+    const BALL_OPTIONS = [
+      { value: 'SE', label: '🔵 Action on CollabSE' },
+      { value: 'AM', label: '🟢 Action on CollabPSS' },
+      { value: 'Partner', label: '🟣 Action on Partner' },
+      { value: 'Customer', label: '🟠 Action on Customer' }
+    ];
+
+    const COLUMN_MAP = {
+      title: ['title', 'opportunity', 'deal', 'deal name', 'opportunity title'],
+      customer: ['customer', 'account', 'account name', 'customer name', 'customer / account name'],
+      se: ['se', 'assigned se', 'solutions engineer', 'assigned solutions engineer'],
+      am: ['am', 'assigned am', 'account manager', 'assigned account manager'],
+      customerContact: ['customer contact', 'contact', 'customer contact name', 'customer contact name & role'],
+      customerEmail: ['customer email', 'customer phone', 'customer contact email', 'customer contact email / phone', 'email'],
+      partner: ['partner', 'partner organization', 'partner org'],
+      partnerContact: ['partner contact', 'partner lead', 'partner lead contact', 'partner lead contact / se'],
+      partnerEmail: ['partner email', 'partner phone', 'partner contact email', 'partner contact email / phone'],
+      amount: ['amount', 'deal amount', 'value', 'tcv', 'pipeline'],
+      closeDate: ['close date', 'target close', 'target close date', 'close'],
+      stage: ['stage', 'pipeline stage'],
+      solution: ['solution', 'solution category', 'product'],
+      health: ['health', 'deal health'],
+      ballInCourt: ['ball in court', 'ball', 'action owner', 'next action owner'],
+      whatsNext: ['whats next', "what's next", 'next steps', 'next step'],
+      scLink: ['sc link', 's&c link', 'scope & commit', 'sc url', 's&c url']
+    };
+
+    function uid() {
+      return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      const d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+
+    function formatCurrency(n) {
+      const v = Number(n) || 0;
+      if (v >= 1e6) return '$' + (v / 1e6).toFixed(1) + 'M';
+      if (v >= 1e3) return '$' + (v / 1e3).toFixed(0) + 'K';
+      return '$' + v.toLocaleString();
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      if (isNaN(d)) return iso;
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function isClosed(deal) {
+      return deal.stage === 'Closed';
+    }
+
+    function isActive(deal) {
+      return !isClosed(deal);
+    }
+
+    function stageIndex(stage) {
+      const i = STAGES.indexOf(stage);
+      return i >= 0 ? i : 0;
+    }
+
+    function stageProgress(stage) {
+      if (stage === 'Closed') return 100;
+      const idx = stageIndex(stage);
+      return Math.round(((idx + 1) / (STAGES.length - 1)) * 100);
+    }
+
+    function normalizeBall(val) {
+      if (!val) return 'SE';
+      const s = String(val).toLowerCase();
+      if (s.includes('am') || s.includes('account manager') || s.includes('🟢')) return 'AM';
+      if (s.includes('partner') || s.includes('🟣')) return 'Partner';
+      if (s.includes('customer') || s.includes('🟠')) return 'Customer';
+      return 'SE';
+    }
+
+    function ballLabel(val) {
+      const opt = BALL_OPTIONS.find(o => o.value === val);
+      return opt ? opt.label : BALL_OPTIONS[0].label;
+    }
+
+    function ballColor(val) {
+      const map = { SE: 'text-blue-400 bg-blue-400/10 border-blue-400/30', AM: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30', Partner: 'text-purple-400 bg-purple-400/10 border-purple-400/30', Customer: 'text-orange-400 bg-orange-400/10 border-orange-400/30' };
+      return map[val] || map.SE;
+    }
+
+    function healthColor(h) {
+      const map = { Green: 'text-emerald-400', Yellow: 'text-yellow-400', Red: 'text-red-400' };
+      return map[h] || 'text-slate-400';
+    }
+
+    function extractEmail(str) {
+      if (!str) return '';
+      const m = String(str).match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+      return m ? m[0] : '';
+    }
+
+    function sampleDeals() {
+      const now = Date.now();
+      return [
+        {
+          id: uid(), title: 'Global Webex Calling Migration — Cloud Connect', customer: 'Banco Santander',
+          se: 'Alejandra Gonzalez Romero (SE)', am: 'David Miller (AM)',
+          customerContact: 'Dr. Roberto Silva - CIO / VP Infrastructure', customerEmail: 'roberto.silva@santander.com | +34 91 289 0000',
+          partner: 'NTT Data', partnerContact: 'Carlos Mendoza - Lead Architect', partnerEmail: 'carlos.mendoza@nttdata.com',
+          amount: 2400000, closeDate: '2026-06-30', stage: 'Validation / PoC', solution: 'Webex Calling & Cloud Connect',
+          health: 'Green', ballInCourt: 'SE', whatsNext: 'Complete PSTN redundancy PoC at Madrid HQ; validate Cloud Connect SBC failover.',
+          scLink: 'https://sc.cisco.com/deal/1049281', lastUpdated: new Date(now - 3600000).toISOString(),
+          activities: [
+            { id: uid(), timestamp: new Date(now - 3600000).toISOString(), role: 'SE', text: 'PoC environment deployed. Cloud Connect trunk provisioned for 500 DIDs.' },
+            { id: uid(), timestamp: new Date(now - 86400000).toISOString(), role: 'AM', text: 'Executive briefing completed with CIO. Budget approved for FY26.' },
+            { id: uid(), timestamp: new Date(now - 172800000).toISOString(), role: 'Partner', text: 'NTT Data SOW signed. Migration runbook draft shared.' }
+          ]
+        },
+        {
+          id: uid(), title: 'AI-Powered Contact Center — Webex CC + Virtual Agent', customer: 'Mercado Libre',
+          se: 'Alejandra Gonzalez Romero (SE)', am: 'Sarah Chen (AM)',
+          customerContact: 'Fernanda Oliveira - VP Customer Experience', customerEmail: 'f.oliveira@mercadolibre.com',
+          partner: 'Logicalis', partnerContact: 'James Park - CX Practice Lead', partnerEmail: 'j.park@logicalis.com | +1 512-555-0142',
+          amount: 1850000, closeDate: '2026-04-15', stage: 'Architecture / BoM', solution: 'Webex Contact Center & AI',
+          health: 'Yellow', ballInCourt: 'Partner', whatsNext: 'Logicalis to finalize AI bot integration architecture with Webex Virtual Agent APIs.',
+          scLink: 'https://sc.cisco.com/deal/1049355', lastUpdated: new Date(now - 7200000).toISOString(),
+          activities: [
+            { id: uid(), timestamp: new Date(now - 7200000).toISOString(), role: 'Partner', text: 'Virtual Agent use-case workshop held. 12 intents mapped for L1 support.' },
+            { id: uid(), timestamp: new Date(now - 259200000).toISOString(), role: 'SE', text: 'Delivered CC AI demo with live transcription and agent assist.' }
+          ]
+        },
+        {
+          id: uid(), title: 'Executive Boardrooms — Room Bar Pro + Board Pro (Teams Rooms)', customer: 'Petrobras',
+          se: 'Marco Reyes (SE)', am: 'David Miller (AM)',
+          customerContact: 'Ana Paula Costa - Head of Workplace Technology', customerEmail: 'ap.costa@petrobras.com.br',
+          partner: 'WWT', partnerContact: 'Michael Torres - Collaboration Architect', partnerEmail: 'm.torres@wwt.com',
+          amount: 680000, closeDate: '2026-03-28', stage: 'Proposal / Pricing', solution: 'Cisco Room Devices (RoomOS / Teams Rooms mode)',
+          health: 'Green', ballInCourt: 'AM', whatsNext: 'AM to present final pricing with 3-year EA bundle to procurement.',
+          scLink: 'https://sc.cisco.com/deal/1049402', lastUpdated: new Date(now - 14400000).toISOString(),
+          activities: [
+            { id: uid(), timestamp: new Date(now - 14400000).toISOString(), role: 'AM', text: 'Procurement requested 15% discount. Counter-offer prepared.' },
+            { id: uid(), timestamp: new Date(now - 432000000).toISOString(), role: 'SE', text: 'Site survey complete: 24 boardrooms scoped for Room Bar Pro upgrade.' }
+          ]
+        },
+        {
+          id: uid(), title: 'Webex Suite Enterprise Agreement — 12K Users', customer: 'Grupo Bimbo',
+          se: 'Alejandra Gonzalez Romero (SE)', am: 'Sarah Chen (AM)',
+          customerContact: 'Luis Herrera - Director IT Collaboration', customerEmail: 'luis.herrera@grupobimbo.com',
+          partner: 'Presidio', partnerContact: 'Rachel Kim - Collaboration PM', partnerEmail: 'r.kim@presidio.com',
+          amount: 3200000, closeDate: '2026-02-14', stage: 'Closing', solution: 'Webex Suite & Meetings',
+          health: 'Green', ballInCourt: 'Customer', whatsNext: 'Awaiting final signature from Grupo Bimbo legal on EA amendment.',
+          scLink: 'https://sc.cisco.com/deal/1049120', lastUpdated: new Date(now - 28800000).toISOString(),
+          activities: [
+            { id: uid(), timestamp: new Date(now - 28800000).toISOString(), role: 'Customer', text: 'Legal review in progress. Expected signature by end of week.' },
+            { id: uid(), timestamp: new Date(now - 604800000).toISOString(), role: 'AM', text: 'EA terms finalized. 12K user Webex Suite with Calling add-on.' }
+          ]
+        },
+        {
+          id: uid(), title: 'LATAM HQ UC Refresh — Webex Calling (Closed Won)', customer: 'América Móvil',
+          se: 'Marco Reyes (SE)', am: 'David Miller (AM)',
+          customerContact: 'Ricardo Méndez - CTO', customerEmail: 'r.mendez@americamovil.com',
+          partner: 'NTT Data', partnerContact: 'Elena Vargas - Delivery Manager', partnerEmail: 'e.vargas@nttdata.com',
+          amount: 4100000, closeDate: '2025-11-30', stage: 'Closed', solution: 'Webex Calling & Cloud Connect',
+          health: 'Green', ballInCourt: 'Partner', whatsNext: 'Post-sale handoff to NTT Data for phased rollout across 8 countries.',
+          scLink: 'https://sc.cisco.com/deal/1048877', lastUpdated: new Date(now - 1209600000).toISOString(),
+          activities: [
+            { id: uid(), timestamp: new Date(now - 1209600000).toISOString(), role: 'AM', text: 'Deal closed won! PO received. Kickoff scheduled for Jan 2026.' },
+            { id: uid(), timestamp: new Date(now - 2592000000).toISOString(), role: 'SE', text: 'Final BoM approved. 45K seats Webex Calling with Cloud Connect.' }
+          ]
+        }
+      ];
+    }
+
+    const state = {
+      deals: [],
+      search: '',
+      statusTab: 'all',
+      kpiFilter: null,
+      sort: 'recent',
+      bumpId: null
+    };
+
+    function load() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        try { state.deals = JSON.parse(raw); return; } catch (e) { /* fall through */ }
+      }
+      state.deals = sampleDeals();
+      save();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.deals));
+    }
+
+    function getFilteredDeals() {
+      let list = [...state.deals];
+
+      if (state.statusTab === 'active') list = list.filter(isActive);
+      else if (state.statusTab === 'closed') list = list.filter(isClosed);
+
+      if (state.kpiFilter === 'active') list = list.filter(isActive);
+      else if (state.kpiFilter === 'closed') list = list.filter(isClosed);
+      else if (state.kpiFilter === 'se') list = list.filter(d => d.ballInCourt === 'SE');
+      else if (state.kpiFilter === 'am') list = list.filter(d => d.ballInCourt === 'AM');
+
+      if (state.search) {
+        const q = state.search.toLowerCase();
+        list = list.filter(d => {
+          const fields = [d.title, d.customer, d.se, d.am, d.customerContact, d.customerEmail, d.partner, d.partnerContact, d.partnerEmail, d.whatsNext];
+          const notes = (d.activities || []).map(a => a.text).join(' ');
+          return fields.some(f => f && String(f).toLowerCase().includes(q)) || notes.toLowerCase().includes(q);
+        });
+      }
+
+      if (state.sort === 'recent') {
+        list.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+      } else if (state.sort === 'amount') {
+        list.sort((a, b) => (Number(b.amount) || 0) - (Number(a.amount) || 0));
+      } else if (state.sort === 'closeDate') {
+        list.sort((a, b) => {
+          const da = a.closeDate ? new Date(a.closeDate) : new Date(9999, 0);
+          const db = b.closeDate ? new Date(b.closeDate) : new Date(9999, 0);
+          return da - db;
+        });
+      }
+
+      return list;
+    }
+
+    function computeKPIs() {
+      const total = state.deals.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+      const active = state.deals.filter(isActive);
+      const closed = state.deals.filter(isClosed);
+      const activeAmt = active.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+      const closedAmt = closed.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+      const seCount = state.deals.filter(d => d.ballInCourt === 'SE' && isActive(d)).length;
+      const amCount = state.deals.filter(d => d.ballInCourt === 'AM' && isActive(d)).length;
+      return { total, activeCount: active.length, activeAmt, closedCount: closed.length, closedAmt, seCount, amCount };
+    }
+
+    function renderKPIs() {
+      const kpi = computeKPIs();
+      const items = [
+        { id: null, label: 'Total Pipeline', value: formatCurrency(kpi.total), sub: state.deals.length + ' deals', color: 'border-cisco-cyan/40 hover:border-cisco-cyan' },
+        { id: 'active', label: 'Active Deals', value: kpi.activeCount + ' · ' + formatCurrency(kpi.activeAmt), sub: 'Open pipeline', color: 'border-emerald-500/40 hover:border-emerald-500' },
+        { id: 'closed', label: 'Closed Deals', value: kpi.closedCount + ' · ' + formatCurrency(kpi.closedAmt), sub: 'Won / lost', color: 'border-slate-500/40 hover:border-slate-400' },
+        { id: 'se', label: 'Action: CollabSE', value: kpi.seCount, sub: '🔵 Ball on CollabSE', color: 'border-blue-500/40 hover:border-blue-500' },
+        { id: 'am', label: 'Action: CollabPSS', value: kpi.amCount, sub: '🟢 Ball on CollabPSS', color: 'border-emerald-500/40 hover:border-emerald-500' }
+      ];
+
+      document.getElementById('kpi-ribbon').innerHTML = items.map(item => `
+        <button onclick="App.setKpiFilter(${item.id ? "'" + item.id + "'" : 'null'})"
+          class="kpi-card text-left p-4 rounded-xl bg-slate-900 border ${item.color} ${state.kpiFilter === item.id ? 'active ring-2 ring-cisco-cyan/50 border-cisco-cyan' : 'border-slate-800'}">
+          <p class="text-xs text-slate-400 font-medium">${escapeHtml(item.label)}</p>
+          <p class="text-xl font-bold mt-1">${escapeHtml(String(item.value))}</p>
+          <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(item.sub)}</p>
+        </button>
+      `).join('');
+    }
+
+    function renderStatusTabs() {
+      const active = state.deals.filter(isActive).length;
+      const closed = state.deals.filter(isClosed).length;
+      const tabs = [
+        { id: 'all', label: 'All Deals' },
+        { id: 'active', label: '⚡ Active (' + active + ')' },
+        { id: 'closed', label: '📁 Closed (' + closed + ')' }
+      ];
+      document.getElementById('status-tabs').innerHTML = tabs.map(t => `
+        <button onclick="App.setStatusTab('${t.id}')"
+          class="px-4 py-2 text-sm font-medium transition ${state.statusTab === t.id ? 'bg-cisco-cyan/15 text-cisco-cyan' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}">
+          ${escapeHtml(t.label)}
+        </button>
+      `).join('');
+    }
+
+    function renderContactLink(emailField) {
+      const email = extractEmail(emailField);
+      if (!email) return escapeHtml(emailField || '—');
+      return `<a href="mailto:${escapeHtml(email)}" class="text-cisco-cyan hover:underline">${escapeHtml(emailField)}</a>`;
+    }
+
+    function renderDealCard(deal) {
+      const progress = stageProgress(deal.stage);
+      const activities = (deal.activities || []).slice().sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      const recentNotes = activities.slice(0, 3);
+      const bump = state.bumpId === deal.id ? ' bump' : '';
+
+      const roleColors = { SE: 'text-blue-400', AM: 'text-emerald-400', Partner: 'text-purple-400', Customer: 'text-orange-400' };
+
+      return `
+        <article class="deal-card${bump} bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700" data-id="${escapeHtml(deal.id)}">
+          <div class="p-5">
+            <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                  <h3 class="text-base font-semibold truncate">${escapeHtml(deal.title)}</h3>
+                  ${isClosed(deal) ? '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">Closed</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>'}
+                </div>
+                <p class="text-sm text-slate-400">${escapeHtml(deal.customer)} · <span class="text-slate-300">${formatCurrency(deal.amount)}</span></p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs px-2.5 py-1 rounded-full border ${ballColor(deal.ballInCourt)}">${escapeHtml(ballLabel(deal.ballInCourt))}</span>
+                <span class="text-xs font-medium ${healthColor(deal.health)}">${escapeHtml(deal.health || '—')}</span>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <div class="flex justify-between text-xs text-slate-500 mb-1">
+                <span>${escapeHtml(deal.stage)}</span>
+                <span>${escapeHtml(deal.solution)}</span>
+              </div>
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="stage-bar h-full rounded-full ${isClosed(deal) ? 'bg-slate-500' : 'bg-gradient-to-r from-cisco-blue to-cisco-cyan'}" style="width:${progress}%"></div>
+              </div>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs mb-4">
+              <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
+                <p class="text-blue-400 font-semibold mb-1.5">Cisco Team</p>
+                <p class="text-slate-300">${escapeHtml(deal.se || '—')}</p>
+                <p class="text-slate-400 mt-0.5">${escapeHtml(deal.am || '—')}</p>
+              </div>
+              <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
+                <p class="text-emerald-400 font-semibold mb-1.5">Customer</p>
+                <p class="text-slate-300">${escapeHtml(deal.customerContact || '—')}</p>
+                <p class="text-slate-400 mt-0.5">${renderContactLink(deal.customerEmail)}</p>
+              </div>
+              <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
+                <p class="text-purple-400 font-semibold mb-1.5">Partner</p>
+                <p class="text-slate-300">${escapeHtml(deal.partner || '—')}</p>
+                <p class="text-slate-400">${escapeHtml(deal.partnerContact || '—')}</p>
+                <p class="text-slate-500 mt-0.5">${renderContactLink(deal.partnerEmail)}</p>
+              </div>
+              <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
+                <p class="text-cisco-cyan font-semibold mb-1.5">S&amp;C &amp; Dates</p>
+                ${deal.scLink ? `<a href="${escapeHtml(deal.scLink)}" target="_blank" rel="noopener noreferrer" class="text-cisco-cyan hover:underline block truncate">S&amp;C Deal ↗</a>` : '<p class="text-slate-500">No S&amp;C link</p>'}
+                <p class="text-slate-400 mt-1">Close: ${formatDate(deal.closeDate)}</p>
+              </div>
+            </div>
+
+            ${deal.whatsNext ? `<div class="text-xs bg-slate-950/60 rounded-lg px-3 py-2 border border-slate-800/50 mb-3"><span class="text-slate-500">What's Next:</span> <span class="text-slate-300">${escapeHtml(deal.whatsNext)}</span></div>` : ''}
+
+            <div class="border-t border-slate-800 pt-3">
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Activity Feed</p>
+                <p class="text-xs text-slate-500">Updated ${formatDateTime(deal.lastUpdated)}</p>
+              </div>
+              <div class="space-y-2 mb-3">
+                ${recentNotes.length ? recentNotes.map(a => `
+                  <div class="text-xs flex gap-2">
+                    <span class="font-semibold shrink-0 ${roleColors[a.role] || 'text-slate-400'}">[${escapeHtml(a.role)}]</span>
+                    <span class="text-slate-500 shrink-0">${formatDateTime(a.timestamp)}</span>
+                    <span class="text-slate-300">${escapeHtml(a.text)}</span>
+                  </div>
+                `).join('') : '<p class="text-xs text-slate-500">No activity yet</p>'}
+              </div>
+              <div class="note-form" id="note-form-${escapeHtml(deal.id)}">
+                <div class="flex gap-2 mt-2">
+                  <select id="note-role-${escapeHtml(deal.id)}" class="text-xs rounded bg-slate-950 border border-slate-700 px-2 py-1.5">
+                    <option value="SE">SE</option><option value="AM">AM</option><option value="Partner">Partner</option><option value="Customer">Customer</option>
+                  </select>
+                  <input id="note-text-${escapeHtml(deal.id)}" type="text" placeholder="Add a quick note…" class="flex-1 text-xs rounded bg-slate-950 border border-slate-700 px-3 py-1.5 focus:border-cisco-cyan focus:outline-none">
+                  <button onclick="App.submitNote('${escapeHtml(deal.id)}')" class="text-xs px-3 py-1.5 rounded bg-cisco-cyan text-slate-950 font-semibold hover:bg-sky-300">Save</button>
+                </div>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <button onclick="App.toggleNoteForm('${escapeHtml(deal.id)}')" class="text-xs text-cisco-cyan hover:underline">+ Add Note</button>
+                <button onclick="App.openDealModal('${escapeHtml(deal.id)}')" class="text-xs text-slate-400 hover:text-slate-200">Edit</button>
+                <button onclick="App.deleteDeal('${escapeHtml(deal.id)}')" class="text-xs text-red-400/70 hover:text-red-400">Delete</button>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    function render() {
+      renderKPIs();
+      renderStatusTabs();
+      const deals = getFilteredDeals();
+      const feed = document.getElementById('deal-feed');
+      const empty = document.getElementById('empty-state');
+
+      if (deals.length === 0) {
+        feed.innerHTML = '';
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        feed.innerHTML = deals.map(renderDealCard).join('');
+      }
+
+      if (state.bumpId) {
+        setTimeout(() => { state.bumpId = null; }, 700);
+      }
+    }
+
+    function bumpDeal(id) {
+      const deal = state.deals.find(d => d.id === id);
+      if (deal) {
+        deal.lastUpdated = new Date().toISOString();
+        state.bumpId = id;
+        save();
+      }
+    }
+
+    function populateFormSelects() {
+      const sol = document.querySelector('#deal-form [name=solution]');
+      sol.innerHTML = SOLUTIONS.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      const stg = document.querySelector('#deal-form [name=stage]');
+      stg.innerHTML = STAGES.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      const ball = document.querySelector('#deal-form [name=ballInCourt]');
+      ball.innerHTML = BALL_OPTIONS.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+    }
+
+    function dealToRow(d) {
+      return {
+        'Title': d.title, 'Customer': d.customer, 'SE': d.se, 'AM': d.am,
+        'Customer Contact': d.customerContact, 'Customer Email': d.customerEmail,
+        'Partner': d.partner, 'Partner Contact': d.partnerContact, 'Partner Email': d.partnerEmail,
+        'Amount': d.amount, 'Close Date': d.closeDate, 'Stage': d.stage, 'Solution': d.solution,
+        'Health': d.health, 'Ball in Court': ballLabel(d.ballInCourt), "What's Next": d.whatsNext,
+        'S&C Link': d.scLink
+      };
+    }
+
+    function mapRowToDeal(row) {
+      const normalized = {};
+      const keys = Object.keys(row);
+      keys.forEach(k => {
+        normalized[k.toLowerCase().trim()] = row[k];
+      });
+
+      function getField(field) {
+        const aliases = COLUMN_MAP[field] || [field];
+        for (const alias of aliases) {
+          if (normalized[alias] !== undefined && normalized[alias] !== '') return normalized[alias];
+        }
+        return '';
+      }
+
+      const stageVal = getField('stage');
+      let stage = STAGES.find(s => s.toLowerCase() === String(stageVal).toLowerCase()) || stageVal || 'Discovery / Demo';
+      if (!STAGES.includes(stage)) {
+        const lower = String(stageVal).toLowerCase();
+        if (lower.includes('discover') || lower.includes('demo')) stage = 'Discovery / Demo';
+        else if (lower.includes('poc') || lower.includes('valid')) stage = 'Validation / PoC';
+        else if (lower.includes('arch') || lower.includes('bom')) stage = 'Architecture / BoM';
+        else if (lower.includes('propos') || lower.includes('pric')) stage = 'Proposal / Pricing';
+        else if (lower.includes('clos')) stage = stageVal.toLowerCase().includes('won') || stageVal.toLowerCase().includes('lost') ? 'Closed' : 'Closing';
+        else stage = 'Discovery / Demo';
+      }
+
+      let solution = getField('solution') || SOLUTIONS[0];
+      if (!SOLUTIONS.includes(solution)) {
+        const lower = String(solution).toLowerCase();
+        if (lower.includes('calling') || lower.includes('cloud connect')) solution = SOLUTIONS[0];
+        else if (lower.includes('contact') || lower.includes('ai')) solution = SOLUTIONS[1];
+        else if (lower.includes('room') || lower.includes('board') || lower.includes('device')) solution = SOLUTIONS[2];
+        else if (lower.includes('suite') || lower.includes('meeting')) solution = SOLUTIONS[3];
+      }
+
+      return {
+        id: uid(),
+        title: String(getField('title') || 'Untitled Opportunity'),
+        customer: String(getField('customer') || ''),
+        se: String(getField('se') || ''),
+        am: String(getField('am') || ''),
+        customerContact: String(getField('customerContact') || ''),
+        customerEmail: String(getField('customerEmail') || ''),
+        partner: String(getField('partner') || ''),
+        partnerContact: String(getField('partnerContact') || ''),
+        partnerEmail: String(getField('partnerEmail') || ''),
+        amount: Number(getField('amount')) || 0,
+        closeDate: String(getField('closeDate') || ''),
+        stage,
+        solution,
+        health: String(getField('health') || 'Green'),
+        ballInCourt: normalizeBall(getField('ballInCourt')),
+        whatsNext: String(getField('whatsNext') || ''),
+        scLink: String(getField('scLink') || ''),
+        lastUpdated: new Date().toISOString(),
+        activities: []
+      };
+    }
+
+    const App = {
+      init() {
+        load();
+        populateFormSelects();
+        document.getElementById('search-input').addEventListener('input', e => {
+          state.search = e.target.value;
+          render();
+        });
+        document.getElementById('sort-select').addEventListener('change', e => {
+          state.sort = e.target.value;
+          render();
+        });
+        document.getElementById('restore-file').addEventListener('change', e => App.handleRestore(e));
+        render();
+      },
+
+      setKpiFilter(filter) {
+        state.kpiFilter = state.kpiFilter === filter ? null : filter;
+        render();
+      },
+
+      setStatusTab(tab) {
+        state.statusTab = tab;
+        render();
+      },
+
+      clearFilters() {
+        state.search = '';
+        state.kpiFilter = null;
+        state.statusTab = 'all';
+        document.getElementById('search-input').value = '';
+        render();
+      },
+
+      openDealModal(id) {
+        const form = document.getElementById('deal-form');
+        form.reset();
+        document.getElementById('deal-id').value = '';
+        document.getElementById('deal-modal-title').textContent = 'New Opportunity';
+
+        if (id) {
+          const deal = state.deals.find(d => d.id === id);
+          if (!deal) return;
+          document.getElementById('deal-modal-title').textContent = 'Edit Opportunity';
+          document.getElementById('deal-id').value = deal.id;
+          Object.keys(deal).forEach(key => {
+            const el = form.elements[key];
+            if (el) el.value = deal[key];
+          });
+        }
+
+        document.getElementById('deal-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      },
+
+      closeDealModal() {
+        document.getElementById('deal-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+      },
+
+      saveDeal(e) {
+        e.preventDefault();
+        const form = e.target;
+        const id = document.getElementById('deal-id').value;
+        const data = {};
+        new FormData(form).forEach((v, k) => { if (k !== 'id') data[k] = v; });
+        data.amount = Number(data.amount) || 0;
+
+        if (id) {
+          const idx = state.deals.findIndex(d => d.id === id);
+          if (idx >= 0) {
+            data.id = id;
+            data.activities = state.deals[idx].activities || [];
+            data.lastUpdated = new Date().toISOString();
+            state.deals[idx] = data;
+            state.bumpId = id;
+          }
+        } else {
+          data.id = uid();
+          data.activities = [];
+          data.lastUpdated = new Date().toISOString();
+          state.deals.unshift(data);
+          state.bumpId = data.id;
+        }
+
+        save();
+        this.closeDealModal();
+        render();
+      },
+
+      deleteDeal(id) {
+        if (!confirm('Delete this opportunity? This cannot be undone.')) return;
+        state.deals = state.deals.filter(d => d.id !== id);
+        save();
+        render();
+      },
+
+      toggleNoteForm(id) {
+        const el = document.getElementById('note-form-' + id);
+        if (el) {
+          el.classList.toggle('open');
+          if (el.classList.contains('open')) {
+            const input = document.getElementById('note-text-' + id);
+            if (input) input.focus();
+          }
+        }
+      },
+
+      submitNote(id) {
+        const text = document.getElementById('note-text-' + id)?.value?.trim();
+        const role = document.getElementById('note-role-' + id)?.value || 'SE';
+        if (!text) return;
+
+        const deal = state.deals.find(d => d.id === id);
+        if (!deal) return;
+
+        if (!deal.activities) deal.activities = [];
+        deal.activities.push({ id: uid(), timestamp: new Date().toISOString(), role, text });
+        bumpDeal(id);
+        render();
+
+        const form = document.getElementById('note-form-' + id);
+        if (form) form.classList.remove('open');
+        const input = document.getElementById('note-text-' + id);
+        if (input) input.value = '';
+      },
+
+      openImportModal() {
+        document.getElementById('import-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      },
+
+      closeImportModal() {
+        document.getElementById('import-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+        document.getElementById('import-file').value = '';
+      },
+
+      processImport() {
+        const fileInput = document.getElementById('import-file');
+        const file = fileInput.files[0];
+        if (!file) { alert('Please select a file.'); return; }
+
+        const mode = document.querySelector('input[name=import-mode]:checked')?.value || 'append';
+        const reader = new FileReader();
+
+        reader.onload = function (e) {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+            const imported = rows.map(mapRowToDeal).filter(d => d.title);
+
+            if (mode === 'replace') {
+              state.deals = imported;
+            } else {
+              state.deals = [...imported, ...state.deals];
+            }
+
+            save();
+            App.closeImportModal();
+            render();
+            alert('Imported ' + imported.length + ' deal(s) successfully.');
+          } catch (err) {
+            alert('Import failed: ' + err.message);
+          }
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+
+      exportExcel() {
+        const rows = state.deals.map(dealToRow);
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Pipeline');
+        XLSX.writeFile(wb, 'cisco-collab-pipeline.xlsx');
+      },
+
+      exportCSV() {
+        const rows = state.deals.map(dealToRow);
+        const ws = XLSX.utils.json_to_sheet(rows);
+        const csv = XLSX.utils.sheet_to_csv(ws);
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'cisco-collab-pipeline.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      },
+
+      downloadTemplate() {
+        const sample = [{
+          'Title': 'Webex Calling Migration — Example',
+          'Customer': 'Acme Corp',
+          'SE': 'Jane Doe (SE)',
+          'AM': 'John Smith (AM)',
+          'Customer Contact': 'Mary Johnson - CIO',
+          'Customer Email': 'mary@acme.com',
+          'Partner': 'NTT Data',
+          'Partner Contact': 'Alex Lee - Architect',
+          'Partner Email': 'alex@nttdata.com',
+          'Amount': 500000,
+          'Close Date': '2026-06-30',
+          'Stage': 'Discovery / Demo',
+          'Solution': 'Webex Calling & Cloud Connect',
+          'Health': 'Green',
+          'Ball in Court': 'Action on CollabSE',
+          "What's Next": 'Schedule discovery workshop',
+          'S&C Link': 'https://sc.cisco.com/deal/0000000'
+        }];
+        const ws = XLSX.utils.json_to_sheet(sample);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Template');
+        XLSX.writeFile(wb, 'cisco-pipeline-template.xlsx');
+      },
+
+      backupJSON() {
+        const blob = new Blob([JSON.stringify(state.deals, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'cisco-pipeline-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      },
+
+      restoreJSON() {
+        document.getElementById('restore-file').click();
+      },
+
+      handleRestore(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (ev) {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data)) throw new Error('Invalid format');
+            if (!confirm('Replace all current data with backup? (' + data.length + ' deals)')) return;
+            state.deals = data;
+            save();
+            render();
+            alert('Restored ' + data.length + ' deal(s).');
+          } catch (err) {
+            alert('Restore failed: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      }
+    };
+
+    window.App = App;
+    document.addEventListener('DOMContentLoaded', () => App.init());
+  })();
+  </script>
+</body>
+</html>
