@@ -87,42 +87,7 @@
           "text": "Customer placed deal on hold until Q2."
         }
       ]
-    },
-    {
-      "id": "mu1nh637m6defj",
-      "title": "Webex Suite Enterprise Agreement — 12K Users",
-      "customer": "Grupo Bimbo",
-      "se": "Alejandra Gonzalez Romero (SE)",
-      "am": "Sarah Chen (AM)",
-      "customerContact": "Luis Herrera - Director IT Collaboration",
-      "customerEmail": "luis.herrera@grupobimbo.com",
-      "customerContacts": [],
-      "partner": "Presidio",
-      "partnerContact": "Rachel Kim - Collaboration PM",
-      "partnerEmail": "r.kim@presidio.com",
-      "partnerContacts": [],
-      "amount": 3200000,
-      "closeDate": "2026-02-14",
-      "stage": "Proposal",
-      "dealStatus": "Active",
-      "solutions": [
-        "Webex Suite",
-        "Webex Calling"
-      ],
-      "health": "Green",
-      "ballInCourt": "Customer",
-      "whatsNext": "Awaiting final signature from legal on EA amendment.",
-      "scLink": "https://sc.cisco.com/deal/1049120",
-      "lastUpdated": "2026-09-14T11:42:58.579Z",
-      "activities": [
-        {
-          "id": "mu1nh637tqalzp",
-          "timestamp": "2026-09-14T11:42:58.579Z",
-          "role": "Customer",
-          "text": "Legal review in progress."
-        }
-      ]
     }
   ],
-  "updatedAt": "2026-09-14T19:51:00.327Z"
+  "updatedAt": "2026-09-14T19:51:55.722Z"
 }
