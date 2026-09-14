@@ -122,42 +122,7 @@
           "text": "Legal review in progress."
         }
       ]
-    },
-    {
-      "id": "mu1nh637djurap",
-      "title": "HQ UC Refresh — Webex Calling (Closed Won)",
-      "customer": "América Móvil",
-      "se": "Marco Reyes (SE)",
-      "am": "David Miller (AM)",
-      "customerContact": "Ricardo Méndez - CTO",
-      "customerEmail": "r.mendez@americamovil.com",
-      "customerContacts": [],
-      "partner": "NTT Data",
-      "partnerContact": "Elena Vargas - Delivery Manager",
-      "partnerEmail": "e.vargas@nttdata.com",
-      "partnerContacts": [],
-      "amount": 4100000,
-      "closeDate": "2025-11-30",
-      "stage": "Proposal",
-      "dealStatus": "Closed",
-      "solutions": [
-        "Webex Calling",
-        "On-prem calling"
-      ],
-      "health": "Green",
-      "ballInCourt": "Partner",
-      "whatsNext": "Post-sale handoff to NTT Data for phased rollout.",
-      "scLink": "https://sc.cisco.com/deal/1048877",
-      "lastUpdated": "2026-08-31T19:42:58.579Z",
-      "activities": [
-        {
-          "id": "mu1nh6378ew16v",
-          "timestamp": "2026-08-31T19:42:58.579Z",
-          "role": "AM",
-          "text": "Deal closed won! PO received."
-        }
-      ]
     }
   ],
-  "updatedAt": "2026-09-14T19:50:53.444Z"
+  "updatedAt": "2026-09-14T19:51:00.327Z"
 }
