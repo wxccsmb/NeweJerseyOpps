@@ -1,4 +1,32 @@
 {
-  "deals": [],
-  "updatedAt": "2026-09-14T19:55:07.956Z"
+  "deals": [
+    {
+      "title": "Horizon Blue Cross",
+      "stage": "Discovery",
+      "dealStatus": "Active",
+      "amount": 50000,
+      "closeDate": "2027-02-19",
+      "health": "Green",
+      "ballInCourt": "None",
+      "whatsNext": "Sep 14th - Demo devices/Workspaces in Control Hub",
+      "se": "",
+      "am": "",
+      "customer": "Horizon Blue Cross",
+      "customerContact": "",
+      "customerEmail": "",
+      "partner": "Presidio",
+      "partnerContact": "NA",
+      "partnerEmail": "",
+      "scLink": "https://ciscocollaboration.lightning.force.com/lightning/r/Opportunity/006QQ000018nvMdYAI/view",
+      "solutions": [
+        "Video Endpoints"
+      ],
+      "customerContacts": [],
+      "partnerContacts": [],
+      "id": "mu1o0yvchxe5pw",
+      "activities": [],
+      "lastUpdated": "2026-09-14T19:58:22.344Z"
+    }
+  ],
+  "updatedAt": "2026-09-14T19:58:22.844Z"
 }
