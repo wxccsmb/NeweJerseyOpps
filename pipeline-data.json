@@ -1,58 +1,40 @@
 {
   "deals": [
     {
-      "id": "mu1nh637uqh29p",
-      "title": "Global Webex Calling Migration",
-      "customer": "Banco Santander",
-      "se": "Alejandra Gonzalez Romero (SE)",
+      "id": "mu1nh637194kc1",
+      "title": "Executive Boardrooms — Video Endpoints",
+      "customer": "Petrobras",
+      "se": "Marco Reyes (SE)",
       "am": "David Miller (AM)",
-      "customerContact": "Dr. Roberto Silva - CIO / VP Infrastructure",
-      "customerEmail": "roberto.silva@santander.com | +34 91 289 0000",
-      "customerContacts": [
-        {
-          "id": "mu1nh637ryktew",
-          "name": "Maria Lopez - UC Manager",
-          "email": "m.lopez@santander.com"
-        }
-      ],
-      "partner": "NTT Data",
-      "partnerContact": "Carlos Mendoza - Lead Architect",
-      "partnerEmail": "carlos.mendoza@nttdata.com",
-      "partnerContacts": [
-        {
-          "id": "mu1nh637glcl9n",
-          "name": "Ana Ruiz - PM",
-          "email": "a.ruiz@nttdata.com"
-        }
-      ],
-      "amount": 2400000,
-      "closeDate": "2026-06-30",
-      "stage": "PoC",
-      "dealStatus": "Active",
+      "customerContact": "Ana Paula Costa - Head of Workplace Technology",
+      "customerEmail": "ap.costa@petrobras.com.br",
+      "customerContacts": [],
+      "partner": "WWT",
+      "partnerContact": "Michael Torres - Collaboration Architect",
+      "partnerEmail": "m.torres@wwt.com",
+      "partnerContacts": [],
+      "amount": 680000,
+      "closeDate": "2026-03-28",
+      "stage": "Proposal",
+      "dealStatus": "Hold",
       "solutions": [
-        "Webex Calling",
-        "Webex Calling DI"
+        "Video Endpoints",
+        "Spaces"
       ],
       "health": "Green",
-      "ballInCourt": "SE",
-      "whatsNext": "Complete PSTN redundancy PoC at Madrid HQ.",
-      "scLink": "https://sc.cisco.com/deal/1049281",
-      "lastUpdated": "2026-09-14T18:42:58.579Z",
+      "ballInCourt": "AM",
+      "whatsNext": "On hold pending Q2 budget approval.",
+      "scLink": "https://sc.cisco.com/deal/1049402",
+      "lastUpdated": "2026-09-14T15:42:58.579Z",
       "activities": [
         {
-          "id": "mu1nh637is7cq0",
-          "timestamp": "2026-09-14T18:42:58.579Z",
-          "role": "SE",
-          "text": "PoC environment deployed. Cloud Connect trunk provisioned for 500 DIDs."
-        },
-        {
-          "id": "mu1nh637l1hkwf",
-          "timestamp": "2026-09-13T19:42:58.579Z",
+          "id": "mu1nh637hocq2u",
+          "timestamp": "2026-09-14T15:42:58.579Z",
           "role": "AM",
-          "text": "Executive briefing completed with CIO. Budget approved for FY26."
+          "text": "Customer placed deal on hold until Q2."
         }
       ]
     }
   ],
-  "updatedAt": "2026-09-14T19:53:13.486Z"
+  "updatedAt": "2026-09-14T19:53:53.052Z"
 }
