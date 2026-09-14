@@ -9,14 +9,14 @@
       "health": "Green",
       "ballInCourt": "None",
       "whatsNext": "Sep 14th - Demo devices/Workspaces in Control Hub",
-      "se": "",
-      "am": "",
+      "se": "James Lagan",
+      "am": "Rick Lazev",
       "customer": "Horizon Blue Cross",
-      "customerContact": "",
-      "customerEmail": "",
+      "customerContact": "Thomas Graziano",
+      "customerEmail": "thomas_graziano@horizonblue.com",
       "partner": "Presidio",
       "partnerContact": "NA",
-      "partnerEmail": "",
+      "partnerEmail": "NA",
       "scLink": "https://ciscocollaboration.lightning.force.com/lightning/r/Opportunity/006QQ000018nvMdYAI/view",
       "solutions": [
         "Video Endpoints"
@@ -25,8 +25,8 @@
       "partnerContacts": [],
       "id": "mu1o0yvchxe5pw",
       "activities": [],
-      "lastUpdated": "2026-09-14T19:58:22.344Z"
+      "lastUpdated": "2026-09-14T20:00:11.888Z"
     }
   ],
-  "updatedAt": "2026-09-14T19:58:22.844Z"
+  "updatedAt": "2026-09-14T20:00:12.389Z"
 }
