@@ -1,0 +1,203 @@
+{
+  "deals": [
+    {
+      "id": "mu1nh637uqh29p",
+      "title": "Global Webex Calling Migration",
+      "customer": "Banco Santander",
+      "se": "Alejandra Gonzalez Romero (SE)",
+      "am": "David Miller (AM)",
+      "customerContact": "Dr. Roberto Silva - CIO / VP Infrastructure",
+      "customerEmail": "roberto.silva@santander.com | +34 91 289 0000",
+      "customerContacts": [
+        {
+          "id": "mu1nh637ryktew",
+          "name": "Maria Lopez - UC Manager",
+          "email": "m.lopez@santander.com"
+        }
+      ],
+      "partner": "NTT Data",
+      "partnerContact": "Carlos Mendoza - Lead Architect",
+      "partnerEmail": "carlos.mendoza@nttdata.com",
+      "partnerContacts": [
+        {
+          "id": "mu1nh637glcl9n",
+          "name": "Ana Ruiz - PM",
+          "email": "a.ruiz@nttdata.com"
+        }
+      ],
+      "amount": 2400000,
+      "closeDate": "2026-06-30",
+      "stage": "PoC",
+      "dealStatus": "Active",
+      "solutions": [
+        "Webex Calling",
+        "Webex Calling DI"
+      ],
+      "health": "Green",
+      "ballInCourt": "SE",
+      "whatsNext": "Complete PSTN redundancy PoC at Madrid HQ.",
+      "scLink": "https://sc.cisco.com/deal/1049281",
+      "lastUpdated": "2026-09-14T18:42:58.579Z",
+      "activities": [
+        {
+          "id": "mu1nh637is7cq0",
+          "timestamp": "2026-09-14T18:42:58.579Z",
+          "role": "SE",
+          "text": "PoC environment deployed. Cloud Connect trunk provisioned for 500 DIDs."
+        },
+        {
+          "id": "mu1nh637l1hkwf",
+          "timestamp": "2026-09-13T19:42:58.579Z",
+          "role": "AM",
+          "text": "Executive briefing completed with CIO. Budget approved for FY26."
+        }
+      ]
+    },
+    {
+      "id": "mu1nh637jel1c3",
+      "title": "AI-Powered Contact Center — Webex CC",
+      "customer": "Mercado Libre",
+      "se": "Alejandra Gonzalez Romero (SE)",
+      "am": "Sarah Chen (AM)",
+      "customerContact": "Fernanda Oliveira - VP Customer Experience",
+      "customerEmail": "f.oliveira@mercadolibre.com",
+      "customerContacts": [],
+      "partner": "Logicalis",
+      "partnerContact": "James Park - CX Practice Lead",
+      "partnerEmail": "j.park@logicalis.com",
+      "partnerContacts": [
+        {
+          "id": "mu1nh637qlww3r",
+          "name": "Sofia Chen - SE",
+          "email": "s.chen@logicalis.com"
+        }
+      ],
+      "amount": 1850000,
+      "closeDate": "2026-04-15",
+      "stage": "Seeding",
+      "dealStatus": "Active",
+      "solutions": [
+        "Webex Contact Center"
+      ],
+      "health": "Yellow",
+      "ballInCourt": "Partner",
+      "whatsNext": "Logicalis to finalize AI bot integration architecture.",
+      "scLink": "https://sc.cisco.com/deal/1049355",
+      "lastUpdated": "2026-09-14T17:42:58.579Z",
+      "activities": [
+        {
+          "id": "mu1nh6376d93dq",
+          "timestamp": "2026-09-14T17:42:58.579Z",
+          "role": "Partner",
+          "text": "Virtual Agent use-case workshop held. 12 intents mapped."
+        }
+      ]
+    },
+    {
+      "id": "mu1nh637194kc1",
+      "title": "Executive Boardrooms — Video Endpoints",
+      "customer": "Petrobras",
+      "se": "Marco Reyes (SE)",
+      "am": "David Miller (AM)",
+      "customerContact": "Ana Paula Costa - Head of Workplace Technology",
+      "customerEmail": "ap.costa@petrobras.com.br",
+      "customerContacts": [],
+      "partner": "WWT",
+      "partnerContact": "Michael Torres - Collaboration Architect",
+      "partnerEmail": "m.torres@wwt.com",
+      "partnerContacts": [],
+      "amount": 680000,
+      "closeDate": "2026-03-28",
+      "stage": "Proposal",
+      "dealStatus": "Hold",
+      "solutions": [
+        "Video Endpoints",
+        "Spaces"
+      ],
+      "health": "Green",
+      "ballInCourt": "AM",
+      "whatsNext": "On hold pending Q2 budget approval.",
+      "scLink": "https://sc.cisco.com/deal/1049402",
+      "lastUpdated": "2026-09-14T15:42:58.579Z",
+      "activities": [
+        {
+          "id": "mu1nh637hocq2u",
+          "timestamp": "2026-09-14T15:42:58.579Z",
+          "role": "AM",
+          "text": "Customer placed deal on hold until Q2."
+        }
+      ]
+    },
+    {
+      "id": "mu1nh637m6defj",
+      "title": "Webex Suite Enterprise Agreement — 12K Users",
+      "customer": "Grupo Bimbo",
+      "se": "Alejandra Gonzalez Romero (SE)",
+      "am": "Sarah Chen (AM)",
+      "customerContact": "Luis Herrera - Director IT Collaboration",
+      "customerEmail": "luis.herrera@grupobimbo.com",
+      "customerContacts": [],
+      "partner": "Presidio",
+      "partnerContact": "Rachel Kim - Collaboration PM",
+      "partnerEmail": "r.kim@presidio.com",
+      "partnerContacts": [],
+      "amount": 3200000,
+      "closeDate": "2026-02-14",
+      "stage": "Proposal",
+      "dealStatus": "Active",
+      "solutions": [
+        "Webex Suite",
+        "Webex Calling"
+      ],
+      "health": "Green",
+      "ballInCourt": "Customer",
+      "whatsNext": "Awaiting final signature from legal on EA amendment.",
+      "scLink": "https://sc.cisco.com/deal/1049120",
+      "lastUpdated": "2026-09-14T11:42:58.579Z",
+      "activities": [
+        {
+          "id": "mu1nh637tqalzp",
+          "timestamp": "2026-09-14T11:42:58.579Z",
+          "role": "Customer",
+          "text": "Legal review in progress."
+        }
+      ]
+    },
+    {
+      "id": "mu1nh637djurap",
+      "title": "HQ UC Refresh — Webex Calling (Closed Won)",
+      "customer": "América Móvil",
+      "se": "Marco Reyes (SE)",
+      "am": "David Miller (AM)",
+      "customerContact": "Ricardo Méndez - CTO",
+      "customerEmail": "r.mendez@americamovil.com",
+      "customerContacts": [],
+      "partner": "NTT Data",
+      "partnerContact": "Elena Vargas - Delivery Manager",
+      "partnerEmail": "e.vargas@nttdata.com",
+      "partnerContacts": [],
+      "amount": 4100000,
+      "closeDate": "2025-11-30",
+      "stage": "Proposal",
+      "dealStatus": "Closed",
+      "solutions": [
+        "Webex Calling",
+        "On-prem calling"
+      ],
+      "health": "Green",
+      "ballInCourt": "Partner",
+      "whatsNext": "Post-sale handoff to NTT Data for phased rollout.",
+      "scLink": "https://sc.cisco.com/deal/1048877",
+      "lastUpdated": "2026-08-31T19:42:58.579Z",
+      "activities": [
+        {
+          "id": "mu1nh6378ew16v",
+          "timestamp": "2026-08-31T19:42:58.579Z",
+          "role": "AM",
+          "text": "Deal closed won! PO received."
+        }
+      ]
+    }
+  ],
+  "updatedAt": "2026-09-14T19:49:28.343Z"
+}
