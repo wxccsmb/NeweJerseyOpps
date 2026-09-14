@@ -9,6 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -41,6 +44,9 @@
     .stage-bar { transition: width 0.4s ease; }
     .note-form { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, opacity 0.3s ease; opacity: 0; }
     .note-form.open { max-height: 200px; opacity: 1; }
+    .solution-chip { font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 9999px; background: rgba(0,188,242,0.12); color: #00BCF2; border: 1px solid rgba(0,188,242,0.25); }
+    .contact-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.5rem; align-items: end; }
+    @media (max-width: 640px) { .contact-row { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
@@ -54,9 +60,11 @@
           <h1 class="text-lg font-bold tracking-tight">New Jersey Collaboration</h1>
           <p class="text-xs text-slate-400">Cisco SE &amp; AM Opportunity Tracker</p>
           <p id="deployment-label" class="text-[10px] text-slate-600 mt-0.5" title="Each GitHub Pages repo stores data separately"></p>
+          <p id="sync-status" class="text-[10px] mt-0.5 text-slate-500">⏳ Checking sync…</p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <button onclick="App.openSyncModal()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-cisco-cyan/40 text-cisco-cyan hover:bg-cisco-cyan/10 transition">🐙 GitHub Sync</button>
         <button onclick="App.openImportModal()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Import</button>
         <button onclick="App.exportExcel()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Export Excel</button>
         <button onclick="App.exportCSV()" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-700 hover:border-cisco-cyan hover:text-cisco-cyan transition">Export CSV</button>
@@ -69,6 +77,10 @@
   </header>
 
   <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+    <div id="cloud-banner" class="hidden rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+      <strong>Local-only mode.</strong> Deals are saved in this browser only. Click <button onclick="App.openSyncModal()" class="underline text-cisco-cyan">🐙 GitHub Sync</button> to save deals to your GitHub repo and share across browsers and teammates.
+    </div>
 
     <!-- KPI Ribbon -->
     <section id="kpi-ribbon" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"></section>
@@ -115,13 +127,21 @@
               <label class="block text-xs text-slate-400 mb-1">Opportunity Title</label>
               <input name="title" required class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
             </div>
-            <div>
-              <label class="block text-xs text-slate-400 mb-1">Solution Category</label>
-              <select name="solution" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></select>
+            <div class="sm:col-span-2">
+              <label class="block text-xs text-slate-400 mb-2">Solution Categories <span class="text-slate-500 font-normal">(select multiple)</span></label>
+              <div id="solution-checkboxes" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
             </div>
             <div>
               <label class="block text-xs text-slate-400 mb-1">Stage</label>
               <select name="stage" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Status</label>
+              <select name="dealStatus" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+                <option value="Active">Active</option>
+                <option value="Hold">Hold</option>
+                <option value="Closed">Closed</option>
+              </select>
             </div>
             <div>
               <label class="block text-xs text-slate-400 mb-1">Deal Amount ($)</label>
@@ -179,6 +199,13 @@
               <label class="block text-xs text-slate-400 mb-1">Customer Contact Email / Phone</label>
               <input name="customerEmail" placeholder="roberto.silva@bank.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
             </div>
+            <div class="sm:col-span-2">
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs text-slate-400">Additional Customer Contacts</label>
+                <button type="button" onclick="App.addExtraContact('customer')" class="text-xs text-cisco-cyan hover:underline">+ Add Contact</button>
+              </div>
+              <div id="customer-extra-contacts" class="space-y-2"></div>
+            </div>
           </div>
         </fieldset>
 
@@ -196,6 +223,13 @@
             <div class="sm:col-span-2">
               <label class="block text-xs text-slate-400 mb-1">Partner Contact Email / Phone</label>
               <input name="partnerEmail" placeholder="carlos.mendoza@nttdata.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div class="sm:col-span-2">
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-xs text-slate-400">Additional Partner Contacts</label>
+                <button type="button" onclick="App.addExtraContact('partner')" class="text-xs text-cisco-cyan hover:underline">+ Add Contact</button>
+              </div>
+              <div id="partner-extra-contacts" class="space-y-2"></div>
             </div>
           </div>
         </fieldset>
@@ -238,6 +272,112 @@
     </div>
   </div>
 
+  <!-- Sync Modal -->
+  <div id="sync-modal" class="hidden fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto">
+    <div class="modal-backdrop fixed inset-0 bg-black/70" onclick="App.closeSyncModal()"></div>
+    <div class="relative bg-slate-900 border border-slate-800 rounded-xl w-full max-w-lg my-8 shadow-2xl">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-800">
+        <h2 class="text-lg font-semibold">Sync Setup</h2>
+        <button onclick="App.closeSyncModal()" class="text-slate-400 hover:text-white text-xl leading-none">&times;</button>
+      </div>
+      <div class="px-6 pt-4">
+        <div class="flex rounded-lg border border-slate-800 overflow-hidden mb-4">
+          <button type="button" id="sync-tab-github" onclick="App.showSyncTab('github')" class="flex-1 px-3 py-2 text-xs font-medium bg-cisco-cyan/15 text-cisco-cyan">🐙 GitHub (Recommended)</button>
+          <button type="button" id="sync-tab-firebase" onclick="App.showSyncTab('firebase')" class="flex-1 px-3 py-2 text-xs font-medium bg-slate-900 text-slate-400 hover:text-slate-200">☁️ Firebase</button>
+        </div>
+      </div>
+
+      <!-- GitHub Panel -->
+      <div id="sync-panel-github" class="p-6 pt-0 space-y-4 text-sm">
+        <p class="text-slate-400">Save deals to a <code class="text-cisco-cyan">pipeline-data.json</code> file in your GitHub repo. Perfect if you're already hosting on GitHub Pages.</p>
+        <ol class="list-decimal list-inside space-y-1 text-slate-400 text-xs">
+          <li>Go to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" class="text-cisco-cyan hover:underline">GitHub → Settings → Developer settings → Personal access tokens</a></li>
+          <li>Create a token with <strong class="text-slate-300">repo</strong> scope (classic token)</li>
+          <li>Enter your repo details below — use the same repo where <code class="text-slate-300">index.html</code> is hosted</li>
+        </ol>
+        <form id="github-form" class="space-y-3" onsubmit="App.saveGitHubConfig(event)">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">GitHub Username</label>
+              <input name="owner" required placeholder="your-username" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Repository Name</label>
+              <input name="repo" required placeholder="my-pipeline-repo" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Branch</label>
+              <input name="branch" value="main" placeholder="main" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Data File Path</label>
+              <input name="path" value="pipeline-data.json" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Personal Access Token</label>
+            <input name="token" type="password" required placeholder="ghp_xxxxxxxxxxxx" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            <p class="text-[10px] text-slate-500 mt-1">Stored in this browser only. Never share your token publicly.</p>
+          </div>
+          <div class="flex justify-between gap-3 pt-2">
+            <button type="button" onclick="App.disconnectSync()" class="px-3 py-2 text-xs rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10">Disconnect</button>
+            <div class="flex gap-2">
+              <button type="button" onclick="App.refreshFromRemote()" class="px-3 py-2 text-xs rounded-lg border border-slate-700 text-slate-300 hover:border-slate-500">Refresh</button>
+              <button type="button" onclick="App.closeSyncModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-700">Cancel</button>
+              <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg bg-cisco-cyan text-slate-950 hover:bg-sky-300">Save &amp; Connect</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Firebase Panel -->
+      <div id="sync-panel-firebase" class="hidden p-6 pt-0 space-y-4 text-sm">
+        <p class="text-slate-400">Alternative: connect a free <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" class="text-cisco-cyan hover:underline">Firebase</a> project.</p>
+        <form id="cloud-form" class="space-y-3" onsubmit="App.saveCloudConfig(event)">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">API Key</label>
+            <input name="apiKey" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Auth Domain</label>
+            <input name="authDomain" placeholder="your-project.firebaseapp.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Project ID</label>
+            <input name="projectId" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Storage Bucket</label>
+              <input name="storageBucket" placeholder="your-project.appspot.com" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Messaging Sender ID</label>
+              <input name="messagingSenderId" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">App ID</label>
+            <input name="appId" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Pipeline ID</label>
+            <input name="pipelineId" id="cloud-pipeline-id" class="w-full px-3 py-2 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div class="flex justify-between gap-3 pt-2">
+            <button type="button" onclick="App.disconnectSync()" class="px-3 py-2 text-xs rounded-lg border border-red-500/40 text-red-400 hover:bg-red-500/10">Disconnect</button>
+            <div class="flex gap-2">
+              <button type="button" onclick="App.closeSyncModal()" class="px-4 py-2 text-sm rounded-lg border border-slate-700">Cancel</button>
+              <button type="submit" class="px-5 py-2 text-sm font-semibold rounded-lg bg-cisco-cyan text-slate-950 hover:bg-sky-300">Save &amp; Connect</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- Hidden file input for JSON restore -->
   <input type="file" id="restore-file" accept=".json" class="hidden">
 
@@ -259,27 +399,36 @@
       return path === '/' ? 'root' : path.replace(/^\//, '');
     }
 
-    const STAGES = [
-      'Discovery / Demo',
-      'Validation / PoC',
-      'Architecture / BoM',
-      'Proposal / Pricing',
-      'Closing',
-      'Closed'
-    ];
+    const STAGES = ['Discovery', 'Demo', 'Seeding', 'PoC', 'Proposal'];
+
+    const DEAL_STATUSES = ['Active', 'Hold', 'Closed'];
 
     const SOLUTIONS = [
-      'Webex Calling & Cloud Connect',
-      'Webex Contact Center & AI',
-      'Cisco Room Devices (RoomOS / Teams Rooms mode)',
-      'Webex Suite & Meetings'
+      'Webex Calling',
+      'Webex Suite',
+      'Video Endpoints',
+      'Webex Contact Center',
+      'Webex Calling DI',
+      'On-prem calling',
+      'on-prem CC',
+      'Spaces'
     ];
+
+    const STAGE_MIGRATION = {
+      'discovery / demo': 'Discovery',
+      'validation / poc': 'PoC',
+      'architecture / bom': 'Seeding',
+      'proposal / pricing': 'Proposal',
+      'closing': 'Proposal',
+      'closed': 'Proposal'
+    };
 
     const BALL_OPTIONS = [
       { value: 'SE', label: '🔵 Action on CollabSE' },
       { value: 'AM', label: '🟢 Action on CollabPSS' },
       { value: 'Partner', label: '🟣 Action on Partner' },
-      { value: 'Customer', label: '🟠 Action on Customer' }
+      { value: 'Customer', label: '🟠 Action on Customer' },
+      { value: 'None', label: '⚪ Nothing Pending' }
     ];
 
     const COLUMN_MAP = {
@@ -295,8 +444,11 @@
       amount: ['amount', 'deal amount', 'value', 'tcv', 'pipeline'],
       closeDate: ['close date', 'target close', 'target close date', 'close'],
       stage: ['stage', 'pipeline stage'],
-      solution: ['solution', 'solution category', 'product'],
+      solutions: ['solutions', 'solution categories', 'solution category', 'solution', 'product'],
+      dealStatus: ['status', 'deal status'],
       health: ['health', 'deal health'],
+      customerContacts: ['additional customer contacts', 'customer contacts extra'],
+      partnerContacts: ['additional partner contacts', 'partner contacts extra'],
       ballInCourt: ['ball in court', 'ball', 'action owner', 'next action owner'],
       whatsNext: ['whats next', "what's next", 'next steps', 'next step'],
       scLink: ['sc link', 's&c link', 'scope & commit', 'sc url', 's&c url']
@@ -333,28 +485,127 @@
       return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     }
 
+    function getSolutions(deal) {
+      if (Array.isArray(deal.solutions) && deal.solutions.length) return deal.solutions;
+      if (deal.solution) return Array.isArray(deal.solution) ? deal.solution : [deal.solution];
+      return [];
+    }
+
+    function normalizeStage(stage) {
+      if (!stage) return 'Discovery';
+      if (STAGES.includes(stage)) return stage;
+      const mapped = STAGE_MIGRATION[String(stage).toLowerCase().trim()];
+      if (mapped) return mapped;
+      const lower = String(stage).toLowerCase();
+      if (lower.includes('demo')) return 'Demo';
+      if (lower.includes('seed')) return 'Seeding';
+      if (lower.includes('poc')) return 'PoC';
+      if (lower.includes('propos')) return 'Proposal';
+      if (lower.includes('discover')) return 'Discovery';
+      return 'Discovery';
+    }
+
+    function mapLegacySolution(s) {
+      const lower = String(s).toLowerCase().trim();
+      if (lower.includes('calling di')) return 'Webex Calling DI';
+      if (lower.includes('on-prem cc') || lower.includes('on prem cc')) return 'on-prem CC';
+      if (lower.includes('on-prem') || lower.includes('on prem')) return 'On-prem calling';
+      if (lower.includes('contact center') || lower.includes('contact centre')) return 'Webex Contact Center';
+      if (lower.includes('video') || lower.includes('room') || lower.includes('endpoint') || lower.includes('board')) return 'Video Endpoints';
+      if (lower.includes('spaces')) return 'Spaces';
+      if (lower.includes('suite')) return 'Webex Suite';
+      if (lower.includes('calling')) return 'Webex Calling';
+      return s;
+    }
+
+    function normalizeSolutions(raw) {
+      if (!raw) return [];
+      const list = Array.isArray(raw) ? raw : String(raw).split(/[;,|]/);
+      const mapped = list.map(s => s.trim()).filter(Boolean).map(s => {
+        if (SOLUTIONS.includes(s)) return s;
+        const legacy = mapLegacySolution(s);
+        return SOLUTIONS.includes(legacy) ? legacy : s;
+      });
+      return [...new Set(mapped.filter(s => SOLUTIONS.includes(s)))];
+    }
+
+    function normalizeDeal(deal) {
+      if (deal.stage === 'Closed' || String(deal.stage).toLowerCase() === 'closed') {
+        deal.dealStatus = 'Closed';
+      }
+      if (!deal.dealStatus) deal.dealStatus = 'Active';
+      deal.stage = normalizeStage(deal.stage);
+      deal.solutions = normalizeSolutions(getSolutions(deal));
+      if (!deal.customerContacts) deal.customerContacts = [];
+      if (!deal.partnerContacts) deal.partnerContacts = [];
+      delete deal.solution;
+      return deal;
+    }
+
     function isClosed(deal) {
-      return deal.stage === 'Closed';
+      return deal.dealStatus === 'Closed';
+    }
+
+    function isOnHold(deal) {
+      return deal.dealStatus === 'Hold';
     }
 
     function isActive(deal) {
-      return !isClosed(deal);
+      return deal.dealStatus === 'Active' || deal.dealStatus === 'Hold';
     }
 
     function stageIndex(stage) {
-      const i = STAGES.indexOf(stage);
+      const i = STAGES.indexOf(normalizeStage(stage));
       return i >= 0 ? i : 0;
     }
 
     function stageProgress(stage) {
-      if (stage === 'Closed') return 100;
       const idx = stageIndex(stage);
-      return Math.round(((idx + 1) / (STAGES.length - 1)) * 100);
+      return Math.round(((idx + 1) / STAGES.length) * 100);
+    }
+
+    function statusBadge(deal) {
+      if (isClosed(deal)) return '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">Closed</span>';
+      if (isOnHold(deal)) return '<span class="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400">Hold</span>';
+      return '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>';
+    }
+
+    function renderSolutionChips(deal) {
+      const solutions = getSolutions(deal);
+      if (!solutions.length) return '<span class="text-slate-500">—</span>';
+      return solutions.map(s => `<span class="solution-chip">${escapeHtml(s)}</span>`).join(' ');
+    }
+
+    function renderExtraContacts(contacts) {
+      if (!contacts || !contacts.length) return '';
+      return contacts.map(c => `
+        <p class="text-slate-400 mt-1 border-t border-slate-800/50 pt-1">
+          <span class="text-slate-300">${escapeHtml(c.name || '—')}</span>
+          ${c.email ? '<br>' + renderContactLink(c.email) : ''}
+        </p>
+      `).join('');
+    }
+
+    function contactsToExport(contacts) {
+      if (!contacts || !contacts.length) return '';
+      return contacts.map(c => `${c.name || ''} <${c.email || ''}>`).join('; ');
+    }
+
+    function parseContactsField(raw) {
+      if (!raw) return [];
+      if (Array.isArray(raw)) return raw;
+      return String(raw).split(';').map(part => {
+        const match = part.match(/^(.+?)\s*<(.+?)>\s*$/);
+        if (match) return { id: uid(), name: match[1].trim(), email: match[2].trim() };
+        const email = extractEmail(part);
+        return { id: uid(), name: part.replace(email, '').trim() || part.trim(), email };
+      }).filter(c => c.name || c.email);
     }
 
     function normalizeBall(val) {
       if (!val) return 'SE';
       const s = String(val).toLowerCase();
+      if (s.includes('nothing') || s.includes('none') || s.includes('no action') || s.includes('⚪') || s.includes('pending') && s.includes('nothing')) return 'None';
       if (s.includes('am') || s.includes('account manager') || s.includes('🟢')) return 'AM';
       if (s.includes('partner') || s.includes('🟣')) return 'Partner';
       if (s.includes('customer') || s.includes('🟠')) return 'Customer';
@@ -367,7 +618,7 @@
     }
 
     function ballColor(val) {
-      const map = { SE: 'text-blue-400 bg-blue-400/10 border-blue-400/30', AM: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30', Partner: 'text-purple-400 bg-purple-400/10 border-purple-400/30', Customer: 'text-orange-400 bg-orange-400/10 border-orange-400/30' };
+      const map = { SE: 'text-blue-400 bg-blue-400/10 border-blue-400/30', AM: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30', Partner: 'text-purple-400 bg-purple-400/10 border-purple-400/30', Customer: 'text-orange-400 bg-orange-400/10 border-orange-400/30', None: 'text-slate-400 bg-slate-400/10 border-slate-400/30' };
       return map[val] || map.SE;
     }
 
@@ -386,73 +637,91 @@
       const now = Date.now();
       return [
         {
-          id: uid(), title: 'Global Webex Calling Migration — Cloud Connect', customer: 'Banco Santander',
+          id: uid(), title: 'Global Webex Calling Migration', customer: 'Banco Santander',
           se: 'Alejandra Gonzalez Romero (SE)', am: 'David Miller (AM)',
           customerContact: 'Dr. Roberto Silva - CIO / VP Infrastructure', customerEmail: 'roberto.silva@santander.com | +34 91 289 0000',
+          customerContacts: [{ id: uid(), name: 'Maria Lopez - UC Manager', email: 'm.lopez@santander.com' }],
           partner: 'NTT Data', partnerContact: 'Carlos Mendoza - Lead Architect', partnerEmail: 'carlos.mendoza@nttdata.com',
-          amount: 2400000, closeDate: '2026-06-30', stage: 'Validation / PoC', solution: 'Webex Calling & Cloud Connect',
-          health: 'Green', ballInCourt: 'SE', whatsNext: 'Complete PSTN redundancy PoC at Madrid HQ; validate Cloud Connect SBC failover.',
+          partnerContacts: [{ id: uid(), name: 'Ana Ruiz - PM', email: 'a.ruiz@nttdata.com' }],
+          amount: 2400000, closeDate: '2026-06-30', stage: 'PoC', dealStatus: 'Active',
+          solutions: ['Webex Calling', 'Webex Calling DI'],
+          health: 'Green', ballInCourt: 'SE', whatsNext: 'Complete PSTN redundancy PoC at Madrid HQ.',
           scLink: 'https://sc.cisco.com/deal/1049281', lastUpdated: new Date(now - 3600000).toISOString(),
           activities: [
             { id: uid(), timestamp: new Date(now - 3600000).toISOString(), role: 'SE', text: 'PoC environment deployed. Cloud Connect trunk provisioned for 500 DIDs.' },
-            { id: uid(), timestamp: new Date(now - 86400000).toISOString(), role: 'AM', text: 'Executive briefing completed with CIO. Budget approved for FY26.' },
-            { id: uid(), timestamp: new Date(now - 172800000).toISOString(), role: 'Partner', text: 'NTT Data SOW signed. Migration runbook draft shared.' }
+            { id: uid(), timestamp: new Date(now - 86400000).toISOString(), role: 'AM', text: 'Executive briefing completed with CIO. Budget approved for FY26.' }
           ]
         },
         {
-          id: uid(), title: 'AI-Powered Contact Center — Webex CC + Virtual Agent', customer: 'Mercado Libre',
+          id: uid(), title: 'AI-Powered Contact Center — Webex CC', customer: 'Mercado Libre',
           se: 'Alejandra Gonzalez Romero (SE)', am: 'Sarah Chen (AM)',
           customerContact: 'Fernanda Oliveira - VP Customer Experience', customerEmail: 'f.oliveira@mercadolibre.com',
-          partner: 'Logicalis', partnerContact: 'James Park - CX Practice Lead', partnerEmail: 'j.park@logicalis.com | +1 512-555-0142',
-          amount: 1850000, closeDate: '2026-04-15', stage: 'Architecture / BoM', solution: 'Webex Contact Center & AI',
-          health: 'Yellow', ballInCourt: 'Partner', whatsNext: 'Logicalis to finalize AI bot integration architecture with Webex Virtual Agent APIs.',
+          customerContacts: [], partner: 'Logicalis', partnerContact: 'James Park - CX Practice Lead', partnerEmail: 'j.park@logicalis.com',
+          partnerContacts: [{ id: uid(), name: 'Sofia Chen - SE', email: 's.chen@logicalis.com' }],
+          amount: 1850000, closeDate: '2026-04-15', stage: 'Seeding', dealStatus: 'Active',
+          solutions: ['Webex Contact Center'],
+          health: 'Yellow', ballInCourt: 'Partner', whatsNext: 'Logicalis to finalize AI bot integration architecture.',
           scLink: 'https://sc.cisco.com/deal/1049355', lastUpdated: new Date(now - 7200000).toISOString(),
           activities: [
-            { id: uid(), timestamp: new Date(now - 7200000).toISOString(), role: 'Partner', text: 'Virtual Agent use-case workshop held. 12 intents mapped for L1 support.' },
-            { id: uid(), timestamp: new Date(now - 259200000).toISOString(), role: 'SE', text: 'Delivered CC AI demo with live transcription and agent assist.' }
+            { id: uid(), timestamp: new Date(now - 7200000).toISOString(), role: 'Partner', text: 'Virtual Agent use-case workshop held. 12 intents mapped.' }
           ]
         },
         {
-          id: uid(), title: 'Executive Boardrooms — Room Bar Pro + Board Pro (Teams Rooms)', customer: 'Petrobras',
+          id: uid(), title: 'Executive Boardrooms — Video Endpoints', customer: 'Petrobras',
           se: 'Marco Reyes (SE)', am: 'David Miller (AM)',
           customerContact: 'Ana Paula Costa - Head of Workplace Technology', customerEmail: 'ap.costa@petrobras.com.br',
-          partner: 'WWT', partnerContact: 'Michael Torres - Collaboration Architect', partnerEmail: 'm.torres@wwt.com',
-          amount: 680000, closeDate: '2026-03-28', stage: 'Proposal / Pricing', solution: 'Cisco Room Devices (RoomOS / Teams Rooms mode)',
-          health: 'Green', ballInCourt: 'AM', whatsNext: 'AM to present final pricing with 3-year EA bundle to procurement.',
+          customerContacts: [], partner: 'WWT', partnerContact: 'Michael Torres - Collaboration Architect', partnerEmail: 'm.torres@wwt.com',
+          partnerContacts: [],
+          amount: 680000, closeDate: '2026-03-28', stage: 'Proposal', dealStatus: 'Hold',
+          solutions: ['Video Endpoints', 'Spaces'],
+          health: 'Green', ballInCourt: 'AM', whatsNext: 'On hold pending Q2 budget approval.',
           scLink: 'https://sc.cisco.com/deal/1049402', lastUpdated: new Date(now - 14400000).toISOString(),
           activities: [
-            { id: uid(), timestamp: new Date(now - 14400000).toISOString(), role: 'AM', text: 'Procurement requested 15% discount. Counter-offer prepared.' },
-            { id: uid(), timestamp: new Date(now - 432000000).toISOString(), role: 'SE', text: 'Site survey complete: 24 boardrooms scoped for Room Bar Pro upgrade.' }
+            { id: uid(), timestamp: new Date(now - 14400000).toISOString(), role: 'AM', text: 'Customer placed deal on hold until Q2.' }
           ]
         },
         {
           id: uid(), title: 'Webex Suite Enterprise Agreement — 12K Users', customer: 'Grupo Bimbo',
           se: 'Alejandra Gonzalez Romero (SE)', am: 'Sarah Chen (AM)',
           customerContact: 'Luis Herrera - Director IT Collaboration', customerEmail: 'luis.herrera@grupobimbo.com',
-          partner: 'Presidio', partnerContact: 'Rachel Kim - Collaboration PM', partnerEmail: 'r.kim@presidio.com',
-          amount: 3200000, closeDate: '2026-02-14', stage: 'Closing', solution: 'Webex Suite & Meetings',
-          health: 'Green', ballInCourt: 'Customer', whatsNext: 'Awaiting final signature from Grupo Bimbo legal on EA amendment.',
+          customerContacts: [], partner: 'Presidio', partnerContact: 'Rachel Kim - Collaboration PM', partnerEmail: 'r.kim@presidio.com',
+          partnerContacts: [],
+          amount: 3200000, closeDate: '2026-02-14', stage: 'Proposal', dealStatus: 'Active',
+          solutions: ['Webex Suite', 'Webex Calling'],
+          health: 'Green', ballInCourt: 'Customer', whatsNext: 'Awaiting final signature from legal on EA amendment.',
           scLink: 'https://sc.cisco.com/deal/1049120', lastUpdated: new Date(now - 28800000).toISOString(),
           activities: [
-            { id: uid(), timestamp: new Date(now - 28800000).toISOString(), role: 'Customer', text: 'Legal review in progress. Expected signature by end of week.' },
-            { id: uid(), timestamp: new Date(now - 604800000).toISOString(), role: 'AM', text: 'EA terms finalized. 12K user Webex Suite with Calling add-on.' }
+            { id: uid(), timestamp: new Date(now - 28800000).toISOString(), role: 'Customer', text: 'Legal review in progress.' }
           ]
         },
         {
-          id: uid(), title: 'LATAM HQ UC Refresh — Webex Calling (Closed Won)', customer: 'América Móvil',
+          id: uid(), title: 'HQ UC Refresh — Webex Calling (Closed Won)', customer: 'América Móvil',
           se: 'Marco Reyes (SE)', am: 'David Miller (AM)',
           customerContact: 'Ricardo Méndez - CTO', customerEmail: 'r.mendez@americamovil.com',
-          partner: 'NTT Data', partnerContact: 'Elena Vargas - Delivery Manager', partnerEmail: 'e.vargas@nttdata.com',
-          amount: 4100000, closeDate: '2025-11-30', stage: 'Closed', solution: 'Webex Calling & Cloud Connect',
-          health: 'Green', ballInCourt: 'Partner', whatsNext: 'Post-sale handoff to NTT Data for phased rollout across 8 countries.',
+          customerContacts: [], partner: 'NTT Data', partnerContact: 'Elena Vargas - Delivery Manager', partnerEmail: 'e.vargas@nttdata.com',
+          partnerContacts: [],
+          amount: 4100000, closeDate: '2025-11-30', stage: 'Proposal', dealStatus: 'Closed',
+          solutions: ['Webex Calling', 'On-prem calling'],
+          health: 'Green', ballInCourt: 'Partner', whatsNext: 'Post-sale handoff to NTT Data for phased rollout.',
           scLink: 'https://sc.cisco.com/deal/1048877', lastUpdated: new Date(now - 1209600000).toISOString(),
           activities: [
-            { id: uid(), timestamp: new Date(now - 1209600000).toISOString(), role: 'AM', text: 'Deal closed won! PO received. Kickoff scheduled for Jan 2026.' },
-            { id: uid(), timestamp: new Date(now - 2592000000).toISOString(), role: 'SE', text: 'Final BoM approved. 45K seats Webex Calling with Cloud Connect.' }
+            { id: uid(), timestamp: new Date(now - 1209600000).toISOString(), role: 'AM', text: 'Deal closed won! PO received.' }
           ]
         }
       ];
     }
+
+    const CLOUD_CONFIG_KEY = 'cisco_pipeline_cloud_config_v1';
+    const GITHUB_CONFIG_KEY = 'cisco_pipeline_github_config_v1';
+    const SYNC_PROVIDER_KEY = 'cisco_pipeline_sync_provider';
+    const CLOUD_COLLECTION = 'pipelines';
+
+    let cloudDb = null;
+    let cloudUnsubscribe = null;
+    let suppressCloudListener = false;
+    let saveRemoteTimer = null;
+    let githubFileSha = null;
+    let githubPollTimer = null;
 
     const state = {
       deals: [],
@@ -460,13 +729,189 @@
       statusTab: 'all',
       kpiFilter: null,
       sort: 'recent',
-      bumpId: null
+      bumpId: null,
+      syncReady: false,
+      syncProvider: null
     };
 
-    function load() {
+    function getCloudConfig() {
+      try {
+        const raw = localStorage.getItem(CLOUD_CONFIG_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+
+    function setCloudConfig(config) {
+      if (config) localStorage.setItem(CLOUD_CONFIG_KEY, JSON.stringify(config));
+      else localStorage.removeItem(CLOUD_CONFIG_KEY);
+    }
+
+    function getGitHubConfig() {
+      try {
+        const raw = localStorage.getItem(GITHUB_CONFIG_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+
+    function setGitHubConfig(config) {
+      if (config) localStorage.setItem(GITHUB_CONFIG_KEY, JSON.stringify(config));
+      else localStorage.removeItem(GITHUB_CONFIG_KEY);
+    }
+
+    function getSyncProvider() {
+      return localStorage.getItem(SYNC_PROVIDER_KEY) || null;
+    }
+
+    function setSyncProvider(provider) {
+      if (provider) localStorage.setItem(SYNC_PROVIDER_KEY, provider);
+      else localStorage.removeItem(SYNC_PROVIDER_KEY);
+    }
+
+    function getCloudPipelineId() {
+      const cfg = getCloudConfig();
+      if (cfg?.pipelineId) return cfg.pipelineId;
+      const label = getDeploymentLabel().replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+      return 'pipeline-' + (label || 'default');
+    }
+
+    function cloudEnabled() {
+      return getSyncProvider() === 'firebase' && !!(getCloudConfig()?.apiKey && getCloudConfig()?.projectId && getCloudConfig()?.appId);
+    }
+
+    function githubEnabled() {
+      const cfg = getGitHubConfig();
+      return getSyncProvider() === 'github' && !!(cfg?.owner && cfg?.repo && cfg?.token);
+    }
+
+    function syncEnabled() {
+      return githubEnabled() || cloudEnabled();
+    }
+
+    function toBase64(str) {
+      return btoa(unescape(encodeURIComponent(str)));
+    }
+
+    function fromBase64(b64) {
+      return decodeURIComponent(escape(atob(b64.replace(/\s/g, ''))));
+    }
+
+    function githubApiUrl(cfg) {
+      const path = (cfg.path || 'pipeline-data.json').replace(/^\//, '');
+      const branch = cfg.branch || 'main';
+      return `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(branch)}`;
+    }
+
+    function githubHeaders(cfg) {
+      return {
+        'Authorization': `Bearer ${cfg.token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+      };
+    }
+
+    async function loadFromGitHub() {
+      const cfg = getGitHubConfig();
+      if (!cfg) return false;
+      try {
+        const res = await fetch(githubApiUrl(cfg), { headers: githubHeaders(cfg) });
+        if (res.status === 404) return false;
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || `GitHub error ${res.status}`);
+        }
+        const data = await res.json();
+        githubFileSha = data.sha;
+        const parsed = JSON.parse(fromBase64(data.content));
+        const deals = Array.isArray(parsed) ? parsed : (parsed.deals || []);
+        if (!Array.isArray(deals)) throw new Error('Invalid pipeline-data.json format');
+        state.deals = deals.map(normalizeDeal);
+        saveLocal();
+        updateSyncStatus('synced-github');
+        return true;
+      } catch (err) {
+        updateSyncStatus('error', err.message);
+        return false;
+      }
+    }
+
+    async function saveToGitHub() {
+      const cfg = getGitHubConfig();
+      if (!cfg) return;
+      const path = (cfg.path || 'pipeline-data.json').replace(/^\//, '');
+      const branch = cfg.branch || 'main';
+      const payload = JSON.stringify({ deals: state.deals, updatedAt: new Date().toISOString() }, null, 2);
+      const body = {
+        message: 'Update collaboration pipeline data',
+        content: toBase64(payload),
+        branch
+      };
+      if (githubFileSha) body.sha = githubFileSha;
+
+      const put = async () => fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: { ...githubHeaders(cfg), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      let res = await put();
+      if (res.status === 409) {
+        const meta = await fetch(githubApiUrl(cfg), { headers: githubHeaders(cfg) });
+        if (meta.ok) {
+          const latest = await meta.json();
+          githubFileSha = latest.sha;
+          body.sha = githubFileSha;
+          res = await put();
+        }
+      }
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub save failed (${res.status})`);
+      }
+      const result = await res.json();
+      githubFileSha = result.content?.sha || githubFileSha;
+      updateSyncStatus('synced-github');
+    }
+
+    function startGitHubPolling() {
+      stopGitHubPolling();
+      githubPollTimer = setInterval(async () => {
+        if (!githubEnabled() || document.hidden) return;
+        const prev = JSON.stringify(state.deals);
+        const loaded = await loadFromGitHub();
+        if (loaded && JSON.stringify(state.deals) !== prev) render();
+      }, 60000);
+    }
+
+    function stopGitHubPolling() {
+      if (githubPollTimer) { clearInterval(githubPollTimer); githubPollTimer = null; }
+    }
+
+    function updateSyncStatus(status, detail) {
+      const el = document.getElementById('sync-status');
+      const banner = document.getElementById('cloud-banner');
+      if (!el) return;
+      const map = {
+        loading: { text: '⏳ Loading…', cls: 'text-slate-500' },
+        local: { text: '💾 Saved locally only', cls: 'text-amber-400' },
+        saving: { text: '🔄 Saving…', cls: 'text-cisco-cyan' },
+        'synced-github': { text: '🐙 Synced to GitHub', cls: 'text-emerald-400' },
+        'synced-firebase': { text: '☁️ Synced to Firebase', cls: 'text-emerald-400' },
+        error: { text: '⚠️ Sync error' + (detail ? ': ' + detail : ''), cls: 'text-red-400' },
+        offline: { text: '💾 Offline — using local cache', cls: 'text-amber-400' }
+      };
+      const info = map[status] || map.local;
+      el.textContent = info.text;
+      el.className = 'text-[10px] mt-0.5 ' + info.cls;
+      if (banner) banner.classList.toggle('hidden', syncEnabled() || status === 'loading');
+    }
+
+    function saveLocal() {
+      localStorage.setItem(getStorageKey(), JSON.stringify(state.deals));
+    }
+
+    function loadLocal() {
       const storageKey = getStorageKey();
       let raw = localStorage.getItem(storageKey);
-
       if (!raw) {
         const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
         if (legacy) {
@@ -474,16 +919,166 @@
           localStorage.setItem(storageKey, legacy);
         }
       }
-
       if (raw) {
-        try { state.deals = JSON.parse(raw); return; } catch (e) { /* fall through */ }
+        try {
+          state.deals = JSON.parse(raw).map(normalizeDeal);
+          return true;
+        } catch (e) { /* fall through */ }
       }
       state.deals = sampleDeals();
-      save();
+      return false;
+    }
+
+    async function initGitHub() {
+      if (!githubEnabled()) return false;
+      state.syncProvider = 'github';
+      state.syncReady = true;
+      startGitHubPolling();
+      return true;
+    }
+
+    async function initCloud() {
+      if (!cloudEnabled()) return false;
+      try {
+        const cfg = getCloudConfig();
+        if (!firebase.apps.length) {
+          firebase.initializeApp({
+            apiKey: cfg.apiKey,
+            authDomain: cfg.authDomain,
+            projectId: cfg.projectId,
+            storageBucket: cfg.storageBucket || undefined,
+            messagingSenderId: cfg.messagingSenderId || undefined,
+            appId: cfg.appId
+          });
+        }
+        await firebase.auth().signInAnonymously();
+        cloudDb = firebase.firestore();
+        state.syncProvider = 'firebase';
+        state.syncReady = true;
+        subscribeCloud();
+        return true;
+      } catch (err) {
+        console.error('Firebase init failed:', err);
+        state.syncReady = false;
+        state.syncProvider = null;
+        updateSyncStatus('error', err.message);
+        return false;
+      }
+    }
+
+    async function initSync() {
+      state.syncReady = false;
+      state.syncProvider = null;
+      stopGitHubPolling();
+      if (cloudUnsubscribe) { cloudUnsubscribe(); cloudUnsubscribe = null; }
+      cloudDb = null;
+
+      if (getSyncProvider() === 'github' && githubEnabled()) {
+        const ok = await initGitHub();
+        if (ok) return true;
+      }
+      if (getSyncProvider() === 'firebase' && cloudEnabled()) {
+        const ok = await initCloud();
+        if (ok) return true;
+      }
+      updateSyncStatus('local');
+      return false;
+    }
+
+    function subscribeCloud() {
+      if (!cloudDb || cloudUnsubscribe) return;
+      cloudUnsubscribe = cloudDb.collection(CLOUD_COLLECTION).doc(getCloudPipelineId()).onSnapshot(
+        doc => {
+          if (suppressCloudListener) return;
+          if (doc.exists && Array.isArray(doc.data().deals)) {
+            state.deals = doc.data().deals.map(normalizeDeal);
+            saveLocal();
+            render();
+            updateSyncStatus('synced-firebase');
+          }
+        },
+        err => updateSyncStatus('error', err.message)
+      );
+    }
+
+    async function loadFromCloud() {
+      if (!cloudDb) return false;
+      try {
+        const doc = await cloudDb.collection(CLOUD_COLLECTION).doc(getCloudPipelineId()).get();
+        if (doc.exists && Array.isArray(doc.data().deals)) {
+          state.deals = doc.data().deals.map(normalizeDeal);
+          saveLocal();
+          updateSyncStatus('synced-firebase');
+          return true;
+        }
+        return false;
+      } catch (err) {
+        updateSyncStatus('error', err.message);
+        return false;
+      }
+    }
+
+    async function saveToCloud() {
+      if (!cloudDb) return;
+      try {
+        suppressCloudListener = true;
+        await cloudDb.collection(CLOUD_COLLECTION).doc(getCloudPipelineId()).set({
+          deals: state.deals,
+          updatedAt: new Date().toISOString(),
+          pipelineId: getCloudPipelineId()
+        });
+        updateSyncStatus('synced-firebase');
+      } catch (err) {
+        updateSyncStatus('error', err.message);
+      } finally {
+        setTimeout(() => { suppressCloudListener = false; }, 300);
+      }
+    }
+
+    async function loadFromRemote() {
+      if (state.syncProvider === 'github') return loadFromGitHub();
+      if (state.syncProvider === 'firebase') return loadFromCloud();
+      return false;
+    }
+
+    async function saveToRemote() {
+      if (state.syncProvider === 'github') return saveToGitHub();
+      if (state.syncProvider === 'firebase') return saveToCloud();
+    }
+
+    async function load() {
+      updateSyncStatus('loading');
+      if (state.syncReady) {
+        const loaded = await loadFromRemote();
+        if (loaded) return;
+        const hadLocal = loadLocal();
+        if (hadLocal) {
+          await saveToRemote();
+          return;
+        }
+        state.deals = sampleDeals();
+        await save();
+        return;
+      }
+      loadLocal();
+      if (!localStorage.getItem(getStorageKey())) saveLocal();
+      updateSyncStatus('local');
     }
 
     function save() {
-      localStorage.setItem(getStorageKey(), JSON.stringify(state.deals));
+      saveLocal();
+      if (!state.syncReady) {
+        updateSyncStatus('local');
+        return Promise.resolve();
+      }
+      updateSyncStatus('saving');
+      clearTimeout(saveRemoteTimer);
+      return new Promise(resolve => {
+        saveRemoteTimer = setTimeout(async () => {
+          try { await saveToRemote(); } catch (e) { updateSyncStatus('error', e.message); }
+          resolve();
+        }, 500);
+      });
     }
 
     function getFilteredDeals() {
@@ -500,7 +1095,9 @@
       if (state.search) {
         const q = state.search.toLowerCase();
         list = list.filter(d => {
-          const fields = [d.title, d.customer, d.se, d.am, d.customerContact, d.customerEmail, d.partner, d.partnerContact, d.partnerEmail, d.whatsNext];
+          const extraCust = (d.customerContacts || []).map(c => `${c.name} ${c.email}`).join(' ');
+          const extraPart = (d.partnerContacts || []).map(c => `${c.name} ${c.email}`).join(' ');
+          const fields = [d.title, d.customer, d.se, d.am, d.customerContact, d.customerEmail, d.partner, d.partnerContact, d.partnerEmail, d.whatsNext, getSolutions(d).join(' '), extraCust, extraPart];
           const notes = (d.activities || []).map(a => a.text).join(' ');
           return fields.some(f => f && String(f).toLowerCase().includes(q)) || notes.toLowerCase().includes(q);
         });
@@ -589,7 +1186,7 @@
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
                   <h3 class="text-base font-semibold truncate">${escapeHtml(deal.title)}</h3>
-                  ${isClosed(deal) ? '<span class="text-xs px-2 py-0.5 rounded-full bg-slate-700 text-slate-300">Closed</span>' : '<span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Active</span>'}
+                  ${statusBadge(deal)}
                 </div>
                 <p class="text-sm text-slate-400">${escapeHtml(deal.customer)} · <span class="text-slate-300">${formatCurrency(deal.amount)}</span></p>
               </div>
@@ -601,9 +1198,9 @@
 
             <div class="mb-3">
               <div class="flex justify-between text-xs text-slate-500 mb-1">
-                <span>${escapeHtml(deal.stage)}</span>
-                <span>${escapeHtml(deal.solution)}</span>
+                <span>Stage: ${escapeHtml(deal.stage)}</span>
               </div>
+              <div class="flex flex-wrap gap-1 mb-2">${renderSolutionChips(deal)}</div>
               <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                 <div class="stage-bar h-full rounded-full ${isClosed(deal) ? 'bg-slate-500' : 'bg-gradient-to-r from-cisco-blue to-cisco-cyan'}" style="width:${progress}%"></div>
               </div>
@@ -619,12 +1216,14 @@
                 <p class="text-emerald-400 font-semibold mb-1.5">Customer</p>
                 <p class="text-slate-300">${escapeHtml(deal.customerContact || '—')}</p>
                 <p class="text-slate-400 mt-0.5">${renderContactLink(deal.customerEmail)}</p>
+                ${renderExtraContacts(deal.customerContacts)}
               </div>
               <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
                 <p class="text-purple-400 font-semibold mb-1.5">Partner</p>
                 <p class="text-slate-300">${escapeHtml(deal.partner || '—')}</p>
                 <p class="text-slate-400">${escapeHtml(deal.partnerContact || '—')}</p>
                 <p class="text-slate-500 mt-0.5">${renderContactLink(deal.partnerEmail)}</p>
+                ${renderExtraContacts(deal.partnerContacts)}
               </div>
               <div class="bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
                 <p class="text-cisco-cyan font-semibold mb-1.5">S&amp;C &amp; Dates</p>
@@ -699,20 +1298,67 @@
     }
 
     function populateFormSelects() {
-      const sol = document.querySelector('#deal-form [name=solution]');
-      sol.innerHTML = SOLUTIONS.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+      document.getElementById('solution-checkboxes').innerHTML = SOLUTIONS.map(s => `
+        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 hover:border-slate-600">
+          <input type="checkbox" name="solutions" value="${escapeHtml(s)}" class="accent-cisco-cyan rounded">
+          <span>${escapeHtml(s)}</span>
+        </label>
+      `).join('');
       const stg = document.querySelector('#deal-form [name=stage]');
       stg.innerHTML = STAGES.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
       const ball = document.querySelector('#deal-form [name=ballInCourt]');
       ball.innerHTML = BALL_OPTIONS.map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
     }
 
+    function renderExtraContactRows(type, contacts) {
+      const container = document.getElementById(type + '-extra-contacts');
+      if (!container) return;
+      container.innerHTML = (contacts || []).map(c => extraContactRowHtml(type, c)).join('');
+    }
+
+    function extraContactRowHtml(type, contact) {
+      const cid = contact.id || uid();
+      return `
+        <div class="contact-row extra-contact-row" data-contact-id="${escapeHtml(cid)}">
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-0.5">Name &amp; Role</label>
+            <input type="text" data-field="name" value="${escapeHtml(contact.name || '')}" placeholder="Name - Role" class="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-[10px] text-slate-500 mb-0.5">Email / Phone</label>
+            <input type="text" data-field="email" value="${escapeHtml(contact.email || '')}" placeholder="email@company.com" class="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-950 border border-slate-700 focus:border-cisco-cyan focus:outline-none">
+          </div>
+          <button type="button" onclick="App.removeExtraContact('${escapeHtml(type)}', '${escapeHtml(cid)}')" class="text-xs text-red-400 hover:text-red-300 px-2 py-1.5">Remove</button>
+        </div>
+      `;
+    }
+
+    function collectExtraContacts(type) {
+      const container = document.getElementById(type + '-extra-contacts');
+      if (!container) return [];
+      return Array.from(container.querySelectorAll('.extra-contact-row')).map(row => ({
+        id: row.dataset.contactId || uid(),
+        name: row.querySelector('[data-field=name]')?.value?.trim() || '',
+        email: row.querySelector('[data-field=email]')?.value?.trim() || ''
+      })).filter(c => c.name || c.email);
+    }
+
+    function setSolutionCheckboxes(selected) {
+      const selectedSet = new Set(normalizeSolutions(selected));
+      document.querySelectorAll('#solution-checkboxes input[name=solutions]').forEach(cb => {
+        cb.checked = selectedSet.has(cb.value);
+      });
+    }
+
     function dealToRow(d) {
       return {
         'Title': d.title, 'Customer': d.customer, 'SE': d.se, 'AM': d.am,
         'Customer Contact': d.customerContact, 'Customer Email': d.customerEmail,
+        'Additional Customer Contacts': contactsToExport(d.customerContacts),
         'Partner': d.partner, 'Partner Contact': d.partnerContact, 'Partner Email': d.partnerEmail,
-        'Amount': d.amount, 'Close Date': d.closeDate, 'Stage': d.stage, 'Solution': d.solution,
+        'Additional Partner Contacts': contactsToExport(d.partnerContacts),
+        'Amount': d.amount, 'Close Date': d.closeDate, 'Stage': d.stage, 'Status': d.dealStatus,
+        'Solutions': getSolutions(d).join('; '),
         'Health': d.health, 'Ball in Court': ballLabel(d.ballInCourt), "What's Next": d.whatsNext,
         'S&C Link': d.scLink
       };
@@ -733,28 +1379,17 @@
         return '';
       }
 
-      const stageVal = getField('stage');
-      let stage = STAGES.find(s => s.toLowerCase() === String(stageVal).toLowerCase()) || stageVal || 'Discovery / Demo';
-      if (!STAGES.includes(stage)) {
-        const lower = String(stageVal).toLowerCase();
-        if (lower.includes('discover') || lower.includes('demo')) stage = 'Discovery / Demo';
-        else if (lower.includes('poc') || lower.includes('valid')) stage = 'Validation / PoC';
-        else if (lower.includes('arch') || lower.includes('bom')) stage = 'Architecture / BoM';
-        else if (lower.includes('propos') || lower.includes('pric')) stage = 'Proposal / Pricing';
-        else if (lower.includes('clos')) stage = stageVal.toLowerCase().includes('won') || stageVal.toLowerCase().includes('lost') ? 'Closed' : 'Closing';
-        else stage = 'Discovery / Demo';
+      const stage = normalizeStage(getField('stage'));
+      const solutions = normalizeSolutions(getField('solutions'));
+      let dealStatus = String(getField('dealStatus') || 'Active');
+      if (!DEAL_STATUSES.includes(dealStatus)) {
+        const lower = dealStatus.toLowerCase();
+        if (lower.includes('hold')) dealStatus = 'Hold';
+        else if (lower.includes('clos')) dealStatus = 'Closed';
+        else dealStatus = 'Active';
       }
 
-      let solution = getField('solution') || SOLUTIONS[0];
-      if (!SOLUTIONS.includes(solution)) {
-        const lower = String(solution).toLowerCase();
-        if (lower.includes('calling') || lower.includes('cloud connect')) solution = SOLUTIONS[0];
-        else if (lower.includes('contact') || lower.includes('ai')) solution = SOLUTIONS[1];
-        else if (lower.includes('room') || lower.includes('board') || lower.includes('device')) solution = SOLUTIONS[2];
-        else if (lower.includes('suite') || lower.includes('meeting')) solution = SOLUTIONS[3];
-      }
-
-      return {
+      return normalizeDeal({
         id: uid(),
         title: String(getField('title') || 'Untitled Opportunity'),
         customer: String(getField('customer') || ''),
@@ -762,28 +1397,32 @@
         am: String(getField('am') || ''),
         customerContact: String(getField('customerContact') || ''),
         customerEmail: String(getField('customerEmail') || ''),
+        customerContacts: parseContactsField(getField('customerContacts')),
         partner: String(getField('partner') || ''),
         partnerContact: String(getField('partnerContact') || ''),
         partnerEmail: String(getField('partnerEmail') || ''),
+        partnerContacts: parseContactsField(getField('partnerContacts')),
         amount: Number(getField('amount')) || 0,
         closeDate: String(getField('closeDate') || ''),
         stage,
-        solution,
+        dealStatus,
+        solutions,
         health: String(getField('health') || 'Green'),
         ballInCourt: normalizeBall(getField('ballInCourt')),
         whatsNext: String(getField('whatsNext') || ''),
         scLink: String(getField('scLink') || ''),
         lastUpdated: new Date().toISOString(),
         activities: []
-      };
+      });
     }
 
     const App = {
-      init() {
-        load();
+      async init() {
         populateFormSelects();
         const deployEl = document.getElementById('deployment-label');
         if (deployEl) deployEl.textContent = 'Data store: ' + getDeploymentLabel();
+        await initSync();
+        await load();
         document.getElementById('search-input').addEventListener('input', e => {
           state.search = e.target.value;
           render();
@@ -793,6 +1432,113 @@
           render();
         });
         document.getElementById('restore-file').addEventListener('change', e => App.handleRestore(e));
+        render();
+      },
+
+      openSyncModal() {
+        const provider = getSyncProvider() || 'github';
+        this.showSyncTab(provider);
+        const ghForm = document.getElementById('github-form');
+        const ghCfg = getGitHubConfig();
+        if (ghCfg) {
+          Object.keys(ghCfg).forEach(key => {
+            const el = ghForm.elements[key];
+            if (el) el.value = ghCfg[key] || '';
+          });
+        }
+        const fbForm = document.getElementById('cloud-form');
+        const fbCfg = getCloudConfig();
+        if (fbCfg) {
+          Object.keys(fbCfg).forEach(key => {
+            const el = fbForm.elements[key];
+            if (el) el.value = fbCfg[key] || '';
+          });
+        }
+        const pid = document.getElementById('cloud-pipeline-id');
+        if (pid && !pid.value) pid.value = getCloudPipelineId();
+        document.getElementById('sync-modal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+      },
+
+      closeSyncModal() {
+        document.getElementById('sync-modal').classList.add('hidden');
+        document.body.style.overflow = '';
+      },
+
+      showSyncTab(tab) {
+        const isGitHub = tab === 'github';
+        document.getElementById('sync-panel-github').classList.toggle('hidden', !isGitHub);
+        document.getElementById('sync-panel-firebase').classList.toggle('hidden', isGitHub);
+        document.getElementById('sync-tab-github').className = isGitHub
+          ? 'flex-1 px-3 py-2 text-xs font-medium bg-cisco-cyan/15 text-cisco-cyan'
+          : 'flex-1 px-3 py-2 text-xs font-medium bg-slate-900 text-slate-400 hover:text-slate-200';
+        document.getElementById('sync-tab-firebase').className = !isGitHub
+          ? 'flex-1 px-3 py-2 text-xs font-medium bg-cisco-cyan/15 text-cisco-cyan'
+          : 'flex-1 px-3 py-2 text-xs font-medium bg-slate-900 text-slate-400 hover:text-slate-200';
+      },
+
+      async saveGitHubConfig(e) {
+        e.preventDefault();
+        const form = e.target;
+        const config = {};
+        new FormData(form).forEach((v, k) => { config[k] = v.trim(); });
+        if (!config.branch) config.branch = 'main';
+        if (!config.path) config.path = 'pipeline-data.json';
+        setGitHubConfig(config);
+        setSyncProvider('github');
+        setCloudConfig(null);
+        if (firebase.apps.length) { try { await firebase.app().delete(); } catch (err) { /* ignore */ } }
+        this.closeSyncModal();
+        await initSync();
+        await load();
+        render();
+        alert('GitHub sync connected! Deals will save to ' + config.path + ' in your repo.');
+      },
+
+      async saveCloudConfig(e) {
+        e.preventDefault();
+        const form = e.target;
+        const config = {};
+        new FormData(form).forEach((v, k) => { config[k] = v.trim(); });
+        if (!config.pipelineId) config.pipelineId = getCloudPipelineId();
+        if (!config.apiKey || !config.projectId || !config.appId) {
+          alert('Please fill in API Key, Project ID, and App ID.');
+          return;
+        }
+        setCloudConfig(config);
+        setSyncProvider('firebase');
+        setGitHubConfig(null);
+        githubFileSha = null;
+        stopGitHubPolling();
+        this.closeSyncModal();
+        await initSync();
+        await load();
+        render();
+        alert('Firebase sync connected! Deals will now save to Firebase.');
+      },
+
+      async refreshFromRemote() {
+        if (!state.syncReady) { alert('Connect sync first.'); return; }
+        updateSyncStatus('loading');
+        const loaded = await loadFromRemote();
+        render();
+        alert(loaded ? 'Refreshed from remote.' : 'No remote data found yet.');
+      },
+
+      disconnectSync() {
+        if (!confirm('Disconnect sync? Data stays in this browser only.')) return;
+        setSyncProvider(null);
+        setGitHubConfig(null);
+        setCloudConfig(null);
+        githubFileSha = null;
+        stopGitHubPolling();
+        if (cloudUnsubscribe) { cloudUnsubscribe(); cloudUnsubscribe = null; }
+        cloudDb = null;
+        state.syncReady = false;
+        state.syncProvider = null;
+        if (firebase.apps.length) firebase.app().delete().catch(() => {});
+        this.closeSyncModal();
+        updateSyncStatus('local');
         render();
       },
 
@@ -819,20 +1565,38 @@
         form.reset();
         document.getElementById('deal-id').value = '';
         document.getElementById('deal-modal-title').textContent = 'New Opportunity';
+        setSolutionCheckboxes([]);
+        renderExtraContactRows('customer', []);
+        renderExtraContactRows('partner', []);
 
         if (id) {
           const deal = state.deals.find(d => d.id === id);
           if (!deal) return;
           document.getElementById('deal-modal-title').textContent = 'Edit Opportunity';
           document.getElementById('deal-id').value = deal.id;
-          Object.keys(deal).forEach(key => {
+          ['title', 'customer', 'se', 'am', 'customerContact', 'customerEmail', 'partner', 'partnerContact', 'partnerEmail', 'amount', 'closeDate', 'stage', 'dealStatus', 'health', 'ballInCourt', 'whatsNext', 'scLink'].forEach(key => {
             const el = form.elements[key];
-            if (el) el.value = deal[key];
+            if (el) el.value = deal[key] ?? '';
           });
+          setSolutionCheckboxes(getSolutions(deal));
+          renderExtraContactRows('customer', deal.customerContacts || []);
+          renderExtraContactRows('partner', deal.partnerContacts || []);
         }
 
         document.getElementById('deal-modal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+      },
+
+      addExtraContact(type) {
+        const container = document.getElementById(type + '-extra-contacts');
+        if (!container) return;
+        container.insertAdjacentHTML('beforeend', extraContactRowHtml(type, { id: uid(), name: '', email: '' }));
+      },
+
+      removeExtraContact(type, contactId) {
+        const container = document.getElementById(type + '-extra-contacts');
+        const row = container?.querySelector(`[data-contact-id="${contactId}"]`);
+        if (row) row.remove();
       },
 
       closeDealModal() {
@@ -845,24 +1609,34 @@
         const form = e.target;
         const id = document.getElementById('deal-id').value;
         const data = {};
-        new FormData(form).forEach((v, k) => { if (k !== 'id') data[k] = v; });
+        new FormData(form).forEach((v, k) => {
+          if (k === 'id' || k === 'solutions') return;
+          data[k] = v;
+        });
         data.amount = Number(data.amount) || 0;
+        data.solutions = Array.from(form.querySelectorAll('input[name=solutions]:checked')).map(cb => cb.value);
+        data.customerContacts = collectExtraContacts('customer');
+        data.partnerContacts = collectExtraContacts('partner');
+        data.dealStatus = data.dealStatus || 'Active';
+        data.stage = normalizeStage(data.stage);
+
+        const normalized = normalizeDeal(data);
 
         if (id) {
           const idx = state.deals.findIndex(d => d.id === id);
           if (idx >= 0) {
-            data.id = id;
-            data.activities = state.deals[idx].activities || [];
-            data.lastUpdated = new Date().toISOString();
-            state.deals[idx] = data;
+            normalized.id = id;
+            normalized.activities = state.deals[idx].activities || [];
+            normalized.lastUpdated = new Date().toISOString();
+            state.deals[idx] = normalized;
             state.bumpId = id;
           }
         } else {
-          data.id = uid();
-          data.activities = [];
-          data.lastUpdated = new Date().toISOString();
-          state.deals.unshift(data);
-          state.bumpId = data.id;
+          normalized.id = uid();
+          normalized.activities = [];
+          normalized.lastUpdated = new Date().toISOString();
+          state.deals.unshift(normalized);
+          state.bumpId = normalized.id;
         }
 
         save();
@@ -985,8 +1759,11 @@
           'Partner Email': 'alex@nttdata.com',
           'Amount': 500000,
           'Close Date': '2026-06-30',
-          'Stage': 'Discovery / Demo',
-          'Solution': 'Webex Calling & Cloud Connect',
+          'Stage': 'Discovery',
+          'Status': 'Active',
+          'Solutions': 'Webex Calling; Webex Suite',
+          'Additional Customer Contacts': 'Jane Analyst <jane@acme.com>',
+          'Additional Partner Contacts': 'Alex Lee <alex@nttdata.com>',
           'Health': 'Green',
           'Ball in Court': 'Action on CollabSE',
           "What's Next": 'Schedule discovery workshop',
@@ -1020,7 +1797,7 @@
             const data = JSON.parse(ev.target.result);
             if (!Array.isArray(data)) throw new Error('Invalid format');
             if (!confirm('Replace all current data with backup? (' + data.length + ' deals)')) return;
-            state.deals = data;
+            state.deals = data.map(normalizeDeal);
             save();
             render();
             alert('Restored ' + data.length + ' deal(s).');
@@ -1034,7 +1811,7 @@
     };
 
     window.App = App;
-    document.addEventListener('DOMContentLoaded', () => App.init());
+    document.addEventListener('DOMContentLoaded', () => { App.init().catch(err => { console.error(err); updateSyncStatus('error', err.message); }); });
   })();
   </script>
 </body>
